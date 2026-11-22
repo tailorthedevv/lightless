@@ -1,0 +1,2017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>UNIT-04 // PICO — Subterranean Ascent</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030408;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas {
+      display: block;
+      background-color: #030408;
+      box-shadow: 0 0 90px rgba(0, 0, 0, 0.96);
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+<canvas id="displayCanvas"></canvas>
+<script src="assets.js"></script>
+<script src="world.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const GAME = window.GAME;
+  const {
+    PIXEL_W,
+    PIXEL_H,
+    TILE_SIZE,
+    FIXED_DT,
+    clamp,
+    lerp,
+    createOffscreen,
+    measurePixelText,
+    drawPixelText,
+    AssetFactory,
+    VerletSystem,
+    ParticleSystem,
+    MachinerySystem,
+    LevelBuilder
+  } = GAME;
+
+  // =========================================================================
+  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (BIOME DRONE, MACHINERY, STEAM, SFX)
+  // =========================================================================
+  class AudioEngine {
+    constructor() {
+      this.ctx = null;
+      this.master = null;
+      this.droneFilter = null;
+      this.muted = false;
+      this.started = false;
+      this.noiseBuffer = null;
+      this.currentBiome = 'sector04';
+    }
+
+    unlock() {
+      if (this.started) {
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        return;
+      }
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      try {
+        this.ctx = new AudioCtx();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.muted ? 0 : 0.34;
+        this.master.connect(this.ctx.destination);
+
+        const len = this.ctx.sampleRate * 1.5;
+        this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const data = this.noiseBuffer.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+        this.startAmbientDrone();
+        this.setBiome(this.currentBiome);
+        this.started = true;
+      } catch (e) {
+        // Ignore audio initialization failures cleanly
+      }
+    }
+
+    toggleMute() {
+      this.muted = !this.muted;
+      if (this.master && this.ctx) {
+        this.master.gain.setTargetAtTime(this.muted ? 0 : 0.34, this.ctx.currentTime, 0.05);
+      }
+    }
+
+    startAmbientDrone() {
+      if (!this.ctx || !this.noiseBuffer) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      src.loop = true;
+
+      this.droneFilter = this.ctx.createBiquadFilter();
+      this.droneFilter.type = 'lowpass';
+      this.droneFilter.frequency.value = 135;
+
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0.09;
+
+      src.connect(this.droneFilter);
+      this.droneFilter.connect(gain);
+      gain.connect(this.master);
+      src.start();
+    }
+
+    setBiome(biome) {
+      this.currentBiome = biome;
+      if (!this.droneFilter || !this.ctx) return;
+      const freq = biome === 'sector07' ? 195 : (biome === 'sector09' ? 105 : 135);
+      this.droneFilter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.35);
+    }
+
+    playStep(isMetal) {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = isMetal ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(isMetal ? 275 : 122, t);
+      osc.frequency.exponentialRampToValueAtTime(isMetal ? 115 : 54, t + 0.045);
+
+      gain.gain.setValueAtTime(isMetal ? 0.08 : 0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.055);
+    }
+
+    playJump() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(215, t);
+      osc.frequency.exponentialRampToValueAtTime(435, t + 0.11);
+      gain.gain.setValueAtTime(0.11, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.14);
+    }
+
+    playLand(hard = false) {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(hard ? 135 : 95, t);
+      osc.frequency.exponentialRampToValueAtTime(36, t + 0.085);
+      gain.gain.setValueAtTime(hard ? 0.16 : 0.09, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.095);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    }
+
+    playShardPickup(count) {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 987.77, 1046.5];
+      const base = notes[count % notes.length];
+      [base, base * 1.5].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + i * 0.045);
+        gain.gain.setValueAtTime(0.12, t + i * 0.045);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.045 + 0.35);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.045);
+        osc.stop(t + i * 0.045 + 0.36);
+      });
+    }
+
+    playOrbActivate() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const chord = [196.0, 293.66, 392.0, 587.33, 739.99];
+      chord.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, t + idx * 0.04);
+        gain.gain.setValueAtTime(0.001, t + idx * 0.04);
+        gain.gain.linearRampToValueAtTime(0.11, t + idx * 0.04 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.04 + 1.15);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + idx * 0.04);
+        osc.stop(t + idx * 0.04 + 1.2);
+      });
+    }
+
+    playWaterDrip() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      const f = 920 + Math.random() * 260;
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.38, t + 0.045);
+      gain.gain.setValueAtTime(0.025, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.065);
+    }
+
+    playMachineryStart() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(64, t);
+      osc.frequency.exponentialRampToValueAtTime(108, t + 0.35);
+
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 260;
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.055, t + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+
+      osc.connect(lp);
+      lp.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.45);
+    }
+
+    playMachineryDock() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(145, t);
+      osc.frequency.exponentialRampToValueAtTime(48, t + 0.09);
+
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 380;
+
+      gain.gain.setValueAtTime(0.09, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+
+      osc.connect(lp);
+      lp.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.12);
+    }
+
+    playSteamHiss() {
+      if (!this.started || this.muted || !this.noiseBuffer) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(2100, t);
+      bp.Q.value = 1.6;
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.055, t + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
+
+      src.connect(bp);
+      bp.connect(gain);
+      gain.connect(this.master);
+      src.start(t);
+      src.stop(t + 0.75);
+    }
+
+    playTerminalBlip() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      [680, 960].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, t + i * 0.055);
+        gain.gain.setValueAtTime(0.045, t + i * 0.055);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.055 + 0.06);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.055);
+        osc.stop(t + i * 0.055 + 0.07);
+      });
+    }
+
+    playSurfaceFinale() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const notes = [261.63, 329.63, 392.0, 493.88, 587.33, 783.99];
+      notes.forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = i < 2 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, t + i * 0.09);
+        gain.gain.setValueAtTime(0.001, t + i * 0.09);
+        gain.gain.linearRampToValueAtTime(0.11, t + i * 0.09 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.09 + 2.2);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.09);
+        osc.stop(t + i * 0.09 + 2.25);
+      });
+    }
+  }
+
+  // =========================================================================
+  // 2. UPGRADED LIGHTING ENGINE (SHADOW MASK, VISOR BEAM, TURBINE SLICING, BOUNCE)
+  // =========================================================================
+  class LightingEngine {
+    constructor() {
+      this.lightW = 640;
+      this.lightH = 360;
+      const off = createOffscreen(this.lightW, this.lightH);
+      this.lightCanvas = off.canvas;
+      this.lightCtx = off.ctx;
+      this.lightCtx.imageSmoothingEnabled = true;
+    }
+
+    getFlicker(time, seed, isFluorescent = false) {
+      if (isFluorescent) {
+        const n = GAME.valueNoise1D(time * 9.5, seed);
+        const buzz = GAME.valueNoise1D(time * 38.0, seed + 19);
+        if (n < 0.12 && buzz < 0.48) return 0.38;
+        return 0.86 + 0.14 * buzz;
+      }
+      const slow = GAME.valueNoise1D(time * 3.8, seed);
+      const fast = GAME.valueNoise1D(time * 14.0, seed + 7);
+      return 0.88 + 0.08 * slow + 0.04 * fast;
+    }
+
+    render(displayCtx, dispW, dispH, camX, camY, time, level, player, playerInterp, stateFlags) {
+      const sxScale = dispW / PIXEL_W;
+      const syScale = dispH / PIXEL_H;
+      const lScaleX = this.lightW / PIXEL_W;
+      const lScaleY = this.lightH / PIXEL_H;
+
+      const pal = level.palette;
+      const lctx = this.lightCtx;
+      lctx.clearRect(0, 0, this.lightW, this.lightH);
+
+      // 1. Deep Biome-Tinted Ambient Shadow Layer
+      lctx.globalCompositeOperation = 'source-over';
+      lctx.fillStyle = stateFlags.finaleActive ? 'rgba(6, 12, 26, 0.48)' : pal.ambientShadow;
+      lctx.fillRect(0, 0, this.lightW, this.lightH);
+
+      lctx.globalCompositeOperation = 'destination-out';
+
+      const carveRadial = (wx, wy, rad, strength = 1.0) => {
+        const lx = (wx - camX) * lScaleX;
+        const ly = (wy - camY) * lScaleY;
+        const lr = rad * lScaleX;
+        if (lx + lr < 0 || lx - lr > this.lightW || ly + lr < 0 || ly - lr > this.lightH) return;
+        const g = lctx.createRadialGradient(lx, ly, lr * 0.05, lx, ly, lr);
+        g.addColorStop(0, `rgba(0,0,0,${strength})`);
+        g.addColorStop(0.5, `rgba(0,0,0,${strength * 0.54})`);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        lctx.fillStyle = g;
+        lctx.beginPath();
+        lctx.arc(lx, ly, lr, 0, Math.PI * 2);
+        lctx.fill();
+      };
+
+      const px = playerInterp.x + player.w * 0.5;
+      const py = playerInterp.y + player.h * 0.45;
+
+      // Subtle player aura + directional headlamp cone carve once awakened
+      carveRadial(px, py, stateFlags.awakened ? 86 : 44, stateFlags.awakened ? 0.94 : 0.65);
+      if (stateFlags.awakened) {
+        const beamDist = 78;
+        const bx = px + player.beamDir * 44;
+        const by = py - 2;
+        const lx = (px - camX) * lScaleX;
+        const ly = (py - camY) * lScaleY;
+        const tx = (px + player.beamDir * beamDist - camX) * lScaleX;
+        const grad = lctx.createRadialGradient(lx, ly, 4, (bx - camX) * lScaleX, (by - camY) * lScaleY, 72 * lScaleX);
+        grad.addColorStop(0, 'rgba(0,0,0,0.85)');
+        grad.addColorStop(0.55, 'rgba(0,0,0,0.45)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        lctx.fillStyle = grad;
+        lctx.beginPath();
+        lctx.moveTo(lx, ly - 4 * lScaleY);
+        lctx.lineTo(tx, ly - 32 * lScaleY);
+        lctx.lineTo(tx, ly + 28 * lScaleY);
+        lctx.lineTo(lx, ly + 4 * lScaleY);
+        lctx.closePath();
+        lctx.fill();
+      }
+
+      // Lamps light carve
+      const lampFlickers = [];
+      for (const lamp of level.lamps) {
+        const flk = this.getFlicker(time, lamp.seed, false);
+        lampFlickers.push(flk);
+        carveRadial(lamp.x + 10, lamp.y + 16, 118 * flk, 0.96);
+        carveRadial(lamp.x + 10, lamp.y + 44, 88 * flk, 0.65);
+      }
+
+      // Signs carve
+      const signFlickers = [];
+      for (const sign of level.signs) {
+        const flk = this.getFlicker(time, sign.flickerSeed, true);
+        signFlickers.push(flk);
+        const cx = sign.x + sign.sprite.width * 0.5;
+        const cy = sign.y + sign.sprite.height * 0.4;
+        carveRadial(cx, cy, (sign.type === 'subway' || sign.type === 'reactor' ? 148 : 102) * (0.7 + 0.3 * flk), 0.98);
+      }
+
+      // Energy Core Orb carve
+      if (level.orb) {
+        const o = level.orb;
+        const orbRad = (o.activated ? 168 : 128) + Math.sin(time * 3.2) * 8;
+        carveRadial(o.x, o.y, orbRad, 1.0);
+      }
+
+      // Crystals / BioMushrooms & Collectible Shards carve
+      for (const cr of level.crystals) carveRadial(cr.x + 10, cr.y + 10, 68, 0.88);
+      for (const sh of level.shards) {
+        if (!sh.collected) carveRadial(sh.x + 6, sh.y + 7, 46, 0.8);
+      }
+
+      // Lore Terminals & Moving Gondola Lanterns + Elevator Beacons
+      for (const tm of level.terminals) carveRadial(tm.x + 10, tm.y + 8, 52, 0.78);
+      if (level.machinery) {
+        for (const g of level.machinery.gondolas) {
+          const gx = lerp(g.prevX, g.x, stateFlags.alpha) + 22;
+          const gy = lerp(g.prevY, g.y, stateFlags.alpha) - 7;
+          carveRadial(gx, gy, 76, 0.88);
+        }
+        for (const e of level.machinery.elevators) {
+          const ex = lerp(e.prevX, e.x, stateFlags.alpha) + 24;
+          const ey = lerp(e.prevY, e.y, stateFlags.alpha) - 6;
+          carveRadial(ex, ey, 58, 0.72);
+        }
+      }
+
+      // Activated conduit lights & Sector 09 open night sky breach
+      if (level.orb && level.orb.activated) {
+        for (const cl of level.conduitLights) carveRadial(cl.x, cl.y - 4, 42, 0.72);
+      }
+      if (level.exitGate) {
+        carveRadial(level.exitGate.cx, level.exitGate.cy, level.exitGate.activated ? 220 : 120, 0.96);
+      }
+      if (level.biome === 'sector09') {
+        carveRadial(36 * TILE_SIZE, 2 * TILE_SIZE, 150, 0.82);
+        // Bottom magma hazard glow carve
+        for (const hz of level.hazards) {
+          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
+            carveRadial(hx, hz.y, 72, 0.75);
+          }
+        }
+      }
+
+      lctx.globalCompositeOperation = 'source-over';
+
+      // Composite smooth shadow mask over crisp pixel scene
+      displayCtx.save();
+      displayCtx.imageSmoothingEnabled = true;
+      displayCtx.globalCompositeOperation = 'source-over';
+      displayCtx.drawImage(this.lightCanvas, 0, 0, dispW, dispH);
+
+      // 2. Additive Volumetric Cones, Turbine Light-Slicing, Bounce & Blooms
+      displayCtx.globalCompositeOperation = 'lighter';
+
+      const drawBloom = (wx, wy, rad, stops) => {
+        const sx = (wx - camX) * sxScale;
+        const sy = (wy - camY) * syScale;
+        const sr = rad * sxScale;
+        if (sx + sr < 0 || sx - sr > dispW || sy + sr < 0 || sy - sr > dispH) return;
+        const g = displayCtx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+        for (const [offset, col] of stops) g.addColorStop(offset, col);
+        displayCtx.fillStyle = g;
+        displayCtx.beginPath();
+        displayCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+        displayCtx.fill();
+      };
+
+      const [sr, sg, sb] = pal.shaftColor;
+      const turbines = level.machinery ? level.machinery.turbines : [];
+
+      // Angled volumetric shafts with rotating turbine blade slicing modulation!
+      for (const sxWorld of [180, 520, 860]) {
+        let sliceMod = 1.0;
+        for (const tb of turbines) {
+          if (Math.abs(sxWorld - (tb.x + 18)) < 90) {
+            sliceMod *= tb.lightPulse;
+          }
+        }
+        const sx = (sxWorld - camX) * sxScale;
+        const sy = (15 - camY) * syScale;
+        const sw = 85 * sxScale;
+        const sh = 260 * syScale;
+        const grad = displayCtx.createLinearGradient(sx, sy, sx + 45 * sxScale, sy + sh);
+        grad.addColorStop(0, `rgba(${sr}, ${sg}, ${sb}, ${0.085 * sliceMod})`);
+        grad.addColorStop(0.6, `rgba(${sr}, ${sg}, ${sb}, ${0.032 * sliceMod})`);
+        grad.addColorStop(1, `rgba(${sr}, ${sg}, ${sb}, 0)`);
+        displayCtx.fillStyle = grad;
+        displayCtx.beginPath();
+        displayCtx.moveTo(sx - sw * 0.3, sy);
+        displayCtx.lineTo(sx + sw * 0.5, sy);
+        displayCtx.lineTo(sx + sw * 1.15, sy + sh);
+        displayCtx.lineTo(sx - sw * 0.1, sy + sh);
+        displayCtx.closePath();
+        displayCtx.fill();
+      }
+
+      // Direct turbine vent pulsing backlight shafts
+      for (const tb of turbines) {
+        drawBloom(tb.x + 18, tb.y + 18, 52 * tb.lightPulse, [
+          [0.0, `rgba(${sr}, ${sg}, ${sb}, ${0.18 * tb.lightPulse})`],
+          [1.0, `rgba(${sr}, ${sg}, ${sb}, 0)`]
+        ]);
+      }
+
+      // Biome-specific Lamp Blooms, Volumetric Cones & Floor Bounce
+      const [lr, lg, lb] = pal.lampGlow;
+      level.lamps.forEach((lamp, i) => {
+        const flk = lampFlickers[i];
+        const bx = lamp.x + 10;
+        const by = lamp.y + 15;
+        drawBloom(bx, by, 76 * flk, [
+          [0.0, `rgba(255, 235, 200, ${0.24 * flk})`],
+          [0.32, `rgba(${lr}, ${lg}, ${lb}, ${0.22 * flk})`],
+          [1.0, `rgba(${lr}, ${lg}, ${lb}, 0)`]
+        ]);
+
+        const cx = (bx - camX) * sxScale;
+        const cy = (by - camY) * syScale;
+        const coneH = 92 * syScale;
+        const coneW = 54 * sxScale;
+        const cg = displayCtx.createLinearGradient(cx, cy, cx, cy + coneH);
+        cg.addColorStop(0, `rgba(${lr}, ${lg}, ${lb}, ${0.18 * flk})`);
+        cg.addColorStop(0.7, `rgba(${lr}, ${lg}, ${lb}, ${0.05 * flk})`);
+        cg.addColorStop(1, `rgba(${lr}, ${lg}, ${lb}, 0)`);
+        displayCtx.fillStyle = cg;
+        displayCtx.beginPath();
+        displayCtx.moveTo(cx - 5 * sxScale, cy);
+        displayCtx.lineTo(cx + 5 * sxScale, cy);
+        displayCtx.lineTo(cx + coneW, cy + coneH);
+        displayCtx.lineTo(cx - coneW, cy + coneH);
+        displayCtx.closePath();
+        displayCtx.fill();
+
+        // Floor bounce glow beneath lamp
+        drawBloom(bx, by + 64, 40 * flk, [
+          [0.0, `rgba(${lr}, ${lg}, ${lb}, ${0.11 * flk})`],
+          [1.0, `rgba(${lr}, ${lg}, ${lb}, 0)`]
+        ]);
+      });
+
+      // Sign Fluorescent Tube Glows
+      level.signs.forEach((sign, i) => {
+        const flk = signFlickers[i];
+        const isBio = sign.type === 'biolab';
+        const isAmber = sign.type === 'reactor';
+        const r = isBio ? 77 : 255;
+        const g = isBio ? 255 : (isAmber ? 170 : 102);
+        const b = isBio ? 219 : (isAmber ? 51 : 217);
+        for (const tb of sign.sprite.tubeBounds) {
+          const tx = sign.x + tb.x + tb.w * 0.5;
+          const ty = sign.y + tb.y + 1;
+          drawBloom(tx, ty, 64 * flk, [
+            [0.0, `rgba(255, 245, 255, ${0.30 * flk})`],
+            [0.35, `rgba(${r}, ${g}, ${b}, ${0.22 * flk})`],
+            [1.0, `rgba(${r}, ${g}, ${b}, 0)`]
+          ]);
+        }
+      });
+
+      // Energy Core Orb Halo
+      if (level.orb) {
+        const o = level.orb;
+        const pulse = 0.85 + 0.15 * Math.sin(time * 4.2);
+        const rad = (o.activated ? 132 : 92) * pulse;
+        const isBio = level.biome === 'sector07';
+        const isAmb = level.biome === 'sector09';
+        const r = isBio ? 65 : 255;
+        const g = isBio ? 255 : (isAmb ? 185 : 102);
+        const b = isBio ? 220 : (isAmb ? 65 : 217);
+        drawBloom(o.x, o.y, rad, [
+          [0.0, 'rgba(255, 255, 255, 0.36)'],
+          [0.35, `rgba(${r}, ${g}, ${b}, 0.32)`],
+          [0.7, `rgba(${r}, ${g}, ${b}, 0.10)`],
+          [1.0, `rgba(${r}, ${g}, ${b}, 0)`]
+        ]);
+      }
+
+      // Crystal / Bioluminescent Mushroom Floor Bounce Glow
+      for (const cr of level.crystals) {
+        const pulse = 0.88 + 0.12 * Math.sin(time * 2.8 + cr.x);
+        const isBio = level.biome === 'sector07';
+        const r = isBio ? 60 : 255;
+        const g = isBio ? 255 : 40;
+        const b = isBio ? 225 : 75;
+        drawBloom(cr.x + 11, cr.y + 14, 48 * pulse, [
+          [0.0, `rgba(${r}, ${g}, ${b}, 0.28)`],
+          [0.5, `rgba(${r}, ${g}, ${b}, 0.14)`],
+          [1.0, `rgba(${r}, ${g}, ${b}, 0)`]
+        ]);
+      }
+
+      // Steam Vent Bounce Glow & Gondola Lantern Glow
+      if (level.machinery) {
+        for (const sv of level.machinery.steamVents) {
+          if (sv.active) {
+            drawBloom(sv.x, sv.y - 14, 34, [
+              [0.0, 'rgba(210, 235, 255, 0.18)'],
+              [1.0, 'rgba(180, 220, 255, 0)']
+            ]);
+          }
+        }
+        for (const g of level.machinery.gondolas) {
+          const gx = lerp(g.prevX, g.x, stateFlags.alpha) + 22;
+          const gy = lerp(g.prevY, g.y, stateFlags.alpha) - 7;
+          drawBloom(gx, gy, 56, [
+            [0.0, 'rgba(255, 235, 190, 0.30)'],
+            [0.45, 'rgba(255, 170, 51, 0.16)'],
+            [1.0, 'rgba(255, 150, 40, 0)']
+          ]);
+        }
+      }
+
+      // Hazard Sump Bottom Glow (Sector 07 Coolant / Sector 09 Molten Magma)
+      for (const hz of level.hazards) {
+        const isLava = level.biome === 'sector09';
+        for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
+          drawBloom(hx, hz.y, 68, [
+            [0.0, isLava ? 'rgba(255, 115, 35, 0.24)' : 'rgba(55, 240, 200, 0.16)'],
+            [1.0, 'rgba(0, 0, 0, 0)']
+          ]);
+        }
+      }
+
+      // Surface Broadcast Relay Sky Pillar Beam
+      if (level.exitGate && level.exitGate.activated) {
+        const ex = (level.exitGate.cx - camX) * sxScale;
+        const ey = (level.exitGate.cy - camY) * syScale;
+        const bg = displayCtx.createLinearGradient(ex, ey, ex, 0);
+        bg.addColorStop(0, 'rgba(255, 245, 205, 0.45)');
+        bg.addColorStop(0.5, 'rgba(120, 230, 255, 0.25)');
+        bg.addColorStop(1, 'rgba(120, 230, 255, 0.08)');
+        displayCtx.fillStyle = bg;
+        displayCtx.fillRect(ex - 26 * sxScale, 0, 52 * sxScale, ey);
+      }
+
+      // Directional Robot Visor Headlamp Cone + Rim Glow
+      if (stateFlags.awakened) {
+        const vx = (px + player.beamDir * 4 - camX) * sxScale;
+        const vy = (py - 2 - camY) * syScale;
+        const beamLen = 96 * sxScale;
+        const beamTipX = vx + player.beamDir * beamLen;
+        const vg = displayCtx.createLinearGradient(vx, vy, beamTipX, vy);
+        vg.addColorStop(0, 'rgba(165, 240, 255, 0.20)');
+        vg.addColorStop(0.5, 'rgba(120, 210, 255, 0.08)');
+        vg.addColorStop(1, 'rgba(120, 210, 255, 0)');
+        displayCtx.fillStyle = vg;
+        displayCtx.beginPath();
+        displayCtx.moveTo(vx, vy - 2 * syScale);
+        displayCtx.lineTo(beamTipX, vy - 24 * syScale);
+        displayCtx.lineTo(beamTipX, vy + 22 * syScale);
+        displayCtx.lineTo(vx, vy + 2 * syScale);
+        displayCtx.closePath();
+        displayCtx.fill();
+      }
+      drawBloom(px, py, 38, [
+        [0.0, 'rgba(200, 232, 255, 0.16)'],
+        [0.6, 'rgba(120, 185, 255, 0.06)'],
+        [1.0, 'rgba(90, 150, 255, 0)']
+      ]);
+
+      // 3. Biome Color-Grading Mist + Silky Cinematic Vignette
+      displayCtx.globalCompositeOperation = 'source-over';
+      displayCtx.fillStyle = pal.fogTint;
+      displayCtx.fillRect(0, 0, dispW, dispH);
+
+      const vig = displayCtx.createRadialGradient(
+        dispW * 0.5,
+        dispH * 0.5,
+        dispH * 0.34,
+        dispW * 0.5,
+        dispH * 0.5,
+        dispW * 0.68
+      );
+      vig.addColorStop(0, 'rgba(2, 4, 10, 0)');
+      vig.addColorStop(1, 'rgba(2, 4, 10, 0.52)');
+      displayCtx.fillStyle = vig;
+      displayCtx.fillRect(0, 0, dispW, dispH);
+
+      displayCtx.restore();
+    }
+  }
+
+  // =========================================================================
+  // 3. PLAYER & CINEMATIC CAMERA (120Hz+ SUB-PIXEL INTERPOLATION)
+  // =========================================================================
+  class Player {
+    constructor(x, y, assets) {
+      this.x = x;
+      this.y = y;
+      this.prevX = x;
+      this.prevY = y;
+      this.w = 12;
+      this.h = 18;
+      this.vx = 0;
+      this.vy = 0;
+      this.assets = assets;
+
+      this.facing = 1;
+      this.beamDir = 1;
+      this.grounded = false;
+      this.onTruss = false;
+      this.onMetal = false;
+      this.ridingPlatformId = null;
+
+      this.coyoteTimer = 0;
+      this.jumpBufferTimer = 0;
+      this.dropThroughTimer = 0;
+
+      this.checkpoint = { x, y };
+      this.animTimer = 0;
+      this.stepSoundTimer = 0;
+      this.blinkTimer = 2.4;
+      this.isBlinking = false;
+      this.squashX = 1;
+      this.squashY = 1;
+      this.hasMoved = false;
+    }
+
+    resetPosition(x, y) {
+      this.x = x;
+      this.y = y;
+      this.prevX = x;
+      this.prevY = y;
+      this.vx = 0;
+      this.vy = 0;
+      this.grounded = false;
+      this.ridingPlatformId = null;
+      this.checkpoint = { x, y };
+    }
+
+    update(dt, input, level, particles, audio, camera, canControl = true) {
+      this.prevX = this.x;
+      this.prevY = this.y;
+
+      const moveDir = canControl ? ((input.right ? 1 : 0) - (input.left ? 1 : 0)) : 0;
+      if (moveDir !== 0) {
+        this.facing = moveDir;
+        this.hasMoved = true;
+      }
+      this.beamDir = lerp(this.beamDir, this.facing, 1 - Math.exp(-12 * dt));
+
+      const maxSpeed = 114;
+      const accel = this.grounded ? 920 : 620;
+      const friction = this.grounded ? 1050 : 280;
+
+      if (moveDir !== 0) {
+        this.vx += moveDir * accel * dt;
+        if (Math.abs(this.vx) > maxSpeed) this.vx = moveDir * maxSpeed;
+      } else {
+        const drop = friction * dt;
+        if (Math.abs(this.vx) <= drop) this.vx = 0;
+        else this.vx -= Math.sign(this.vx) * drop;
+      }
+
+      if (this.dropThroughTimer > 0) this.dropThroughTimer -= dt;
+      if (canControl && this.grounded && this.onTruss && input.down) {
+        this.dropThroughTimer = 0.22;
+        this.grounded = false;
+        this.coyoteTimer = 0;
+        this.vy = 32;
+      }
+
+      if (this.grounded) this.coyoteTimer = 0.11;
+      else if (this.coyoteTimer > 0) this.coyoteTimer -= dt;
+
+      if (canControl && input.jumpPressed) {
+        this.jumpBufferTimer = 0.12;
+        this.hasMoved = true;
+      } else if (this.jumpBufferTimer > 0) {
+        this.jumpBufferTimer -= dt;
+      }
+
+      if (canControl && this.jumpBufferTimer > 0 && this.coyoteTimer > 0 && !(this.onTruss && input.down)) {
+        this.vy = -318;
+        this.grounded = false;
+        this.ridingPlatformId = null;
+        this.coyoteTimer = 0;
+        this.jumpBufferTimer = 0;
+        this.squashX = 0.82;
+        this.squashY = 1.22;
+        particles.spawnDustPuff(this.x + this.w * 0.5, this.y + this.h, 6);
+        audio.playJump();
+      }
+
+      if (canControl && !input.jumpHeld && this.vy < -110) {
+        this.vy *= Math.pow(0.45, dt * 16);
+      }
+
+      const gravity = this.vy < 0 ? 850 : 940;
+      this.vy = Math.min(410, this.vy + gravity * dt);
+
+      // Horizontal step
+      this.x += this.vx * dt;
+      this.resolveHorizontal(level);
+
+      // Vertical step + moving machinery landing
+      const prevBottom = this.y + this.h;
+      const prevVy = this.vy;
+      const wasGrounded = this.grounded;
+      this.y += this.vy * dt;
+      const platforms = level.machinery ? level.machinery.getPlatforms() : [];
+      this.resolveVertical(level, prevBottom, platforms);
+
+      if (!wasGrounded && this.grounded) {
+        const impact = clamp(prevVy / 360, 0.2, 1.0);
+        this.squashX = 1 + 0.24 * impact;
+        this.squashY = 1 - 0.22 * impact;
+        particles.spawnDustPuff(this.x + this.w * 0.5, this.y + this.h, Math.round(4 + impact * 5));
+        if (prevVy > 260) {
+          camera.shake(2.2 * impact);
+          audio.playLand(true);
+        } else {
+          audio.playLand(false);
+        }
+      }
+
+      if (this.grounded && Math.abs(this.vx) > 28) {
+        this.stepSoundTimer -= dt;
+        if (this.stepSoundTimer <= 0) {
+          this.stepSoundTimer = 0.24;
+          audio.playStep(this.onTruss || this.onMetal);
+          if (Math.random() < 0.7) {
+            particles.spawnParticle(
+              this.x + this.w * 0.5 - this.facing * 4,
+              this.y + this.h - 1,
+              -this.facing * 15,
+              -12 - Math.random() * 10,
+              0.22,
+              this.onTruss || this.onMetal ? '#6f8aa8' : '#58708a',
+              30,
+              1
+            );
+          }
+        }
+      } else {
+        this.stepSoundTimer = 0.06;
+      }
+
+      // Shallow puddle splash
+      for (const pd of level.puddles) {
+        const feetY = this.y + this.h;
+        const cx = this.x + this.w * 0.5;
+        if (cx >= pd.x && cx <= pd.x + pd.w && Math.abs(feetY - (pd.y + 4)) < 5) {
+          if ((Math.abs(this.vx) > 20 && Math.random() < dt * 11) || (!wasGrounded && this.grounded)) {
+            particles.spawnWaterSplash(cx, pd.y, 4);
+          }
+        }
+      }
+
+      this.squashX = lerp(this.squashX, 1, 1 - Math.exp(-16 * dt));
+      this.squashY = lerp(this.squashY, 1, 1 - Math.exp(-16 * dt));
+
+      this.animTimer += dt * (Math.abs(this.vx) > 15 ? 11 : 4.5);
+      this.blinkTimer -= dt;
+      if (this.blinkTimer <= 0) {
+        if (this.isBlinking) {
+          this.isBlinking = false;
+          this.blinkTimer = 1.9 + Math.random() * 2.8;
+        } else {
+          this.isBlinking = true;
+          this.blinkTimer = 0.11;
+        }
+      }
+    }
+
+    resolveHorizontal(level) {
+      const topRow = Math.floor((this.y + 1) / TILE_SIZE);
+      const botRow = Math.floor((this.y + this.h - 1) / TILE_SIZE);
+      if (this.vx > 0) {
+        const rightCol = Math.floor((this.x + this.w) / TILE_SIZE);
+        for (let r = topRow; r <= botRow; r++) {
+          if (level.isSolidAtTile(rightCol, r)) {
+            this.x = rightCol * TILE_SIZE - this.w;
+            this.vx = 0;
+            break;
+          }
+        }
+      } else if (this.vx < 0) {
+        const leftCol = Math.floor(this.x / TILE_SIZE);
+        for (let r = topRow; r <= botRow; r++) {
+          if (level.isSolidAtTile(leftCol, r)) {
+            this.x = (leftCol + 1) * TILE_SIZE;
+            this.vx = 0;
+            break;
+          }
+        }
+      }
+    }
+
+    resolveVertical(level, prevBottom, platforms = []) {
+      this.grounded = false;
+      this.onTruss = false;
+      this.onMetal = false;
+      this.ridingPlatformId = null;
+
+      const leftCol = Math.floor((this.x + 1) / TILE_SIZE);
+      const rightCol = Math.floor((this.x + this.w - 1) / TILE_SIZE);
+
+      if (this.vy >= 0) {
+        const botRow = Math.floor((this.y + this.h) / TILE_SIZE);
+        for (let c = leftCol; c <= rightCol; c++) {
+          if (level.isSolidAtTile(c, botRow)) {
+            this.y = botRow * TILE_SIZE - this.h;
+            this.vy = 0;
+            this.grounded = true;
+            return;
+          }
+          if (this.dropThroughTimer <= 0 && level.isTrussAtTile(c, botRow)) {
+            const trussTop = botRow * TILE_SIZE;
+            if (prevBottom <= trussTop + 3) {
+              this.y = trussTop - this.h;
+              this.vy = 0;
+              this.grounded = true;
+              this.onTruss = true;
+              return;
+            }
+          }
+        }
+
+        // Moving machinery platform landing check (zero-slip deck capture)
+        for (const plat of platforms) {
+          if (this.x + this.w - 1 > plat.x && this.x + 1 < plat.x + plat.w) {
+            const catchTop = Math.max(plat.prevY, plat.y) + 5;
+            if (prevBottom <= catchTop && this.y + this.h >= plat.y - 1) {
+              this.y = plat.y - this.h;
+              this.vy = 0;
+              this.grounded = true;
+              this.onMetal = true;
+              this.ridingPlatformId = plat.id;
+              return;
+            }
+          }
+        }
+      } else {
+        const topRow = Math.floor(this.y / TILE_SIZE);
+        for (let c = leftCol; c <= rightCol; c++) {
+          if (level.isSolidAtTile(c, topRow)) {
+            this.y = (topRow + 1) * TILE_SIZE;
+            this.vy = 0;
+            return;
+          }
+        }
+      }
+    }
+
+    getRenderFrame(awakened, wakeTimer) {
+      if (!awakened) {
+        return this.assets.robotFrames.sleep[0];
+      }
+      if (!this.grounded) {
+        return this.vy < 0 ? this.assets.robotFrames.jump[0] : this.assets.robotFrames.fall[0];
+      }
+      if (Math.abs(this.vx) > 14) {
+        const idx = Math.floor(this.animTimer) % this.assets.robotFrames.run.length;
+        return this.assets.robotFrames.run[idx];
+      }
+      const idx = Math.floor(this.animTimer) % this.assets.robotFrames.idle.length;
+      return this.assets.robotFrames.idle[idx];
+    }
+
+    render(ctx, intCamX, intCamY, alpha, awakened, wakeTimer, flipY = false) {
+      const rx = lerp(this.prevX, this.x, alpha);
+      const ry = lerp(this.prevY, this.y, alpha);
+      const frame = this.getRenderFrame(awakened, wakeTimer);
+
+      const footX = Math.round(rx + this.w * 0.5 - intCamX);
+      const footY = Math.round(ry + this.h - intCamY);
+
+      ctx.save();
+      ctx.translate(footX, footY);
+      ctx.scale(this.facing * this.squashX, (flipY ? -1 : 1) * this.squashY);
+      ctx.drawImage(frame, -12, -22);
+
+      // Expressive glowing pixel eyes (powered off during first 0.65s of awakening)
+      const visorLit = awakened || (wakeTimer >= 0.65 && Math.sin(wakeTimer * 45) > -0.2);
+      if (visorLit) {
+        const vx = frame.visorX - 12;
+        const vy = frame.visorY - 22;
+        const lookX = Math.abs(this.vx) > 14 ? 1 : 0;
+        const lookY = !this.grounded ? (this.vy < -60 ? -1 : (this.vy > 100 ? 1 : 0)) : 0;
+
+        if (this.isBlinking) {
+          ctx.fillStyle = '#99f6ff';
+          ctx.fillRect(vx + 2 + lookX, vy + 2, 2, 1);
+          ctx.fillRect(vx + 5 + lookX, vy + 2, 2, 1);
+        } else {
+          ctx.fillStyle = '#99f6ff';
+          ctx.fillRect(vx + 2 + lookX, vy + 1 + lookY, 1, 2);
+          ctx.fillRect(vx + 5 + lookX, vy + 1 + lookY, 1, 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(vx + 2 + lookX, vy + 1 + lookY, 1, 1);
+          ctx.fillRect(vx + 5 + lookX, vy + 1 + lookY, 1, 1);
+        }
+      }
+
+      ctx.restore();
+    }
+  }
+
+  class Camera {
+    constructor(worldW, worldH, startX, startY) {
+      this.worldW = worldW;
+      this.worldH = worldH;
+      this.x = clamp(startX - PIXEL_W * 0.5, 0, worldW - PIXEL_W);
+      this.y = clamp(startY - PIXEL_H * 0.55, 0, worldH - PIXEL_H);
+      this.prevX = this.x;
+      this.prevY = this.y;
+      this.lookAheadX = 0;
+      this.shakeMag = 0;
+      this.shakeX = 0;
+      this.shakeY = 0;
+    }
+
+    snapTo(wx, wy) {
+      this.x = clamp(wx - PIXEL_W * 0.5, 0, this.worldW - PIXEL_W);
+      this.y = clamp(wy - PIXEL_H * 0.55, 0, this.worldH - PIXEL_H);
+      this.prevX = this.x;
+      this.prevY = this.y;
+      this.lookAheadX = 0;
+    }
+
+    shake(amount) {
+      this.shakeMag = Math.max(this.shakeMag, amount);
+    }
+
+    update(dt, player, finaleActive = false) {
+      this.prevX = this.x;
+      this.prevY = this.y;
+
+      const targetLookX = player.facing * 26 + player.vx * 0.14;
+      this.lookAheadX = lerp(this.lookAheadX, targetLookX, 1 - Math.exp(-4.5 * dt));
+
+      const yBias = finaleActive ? PIXEL_H * 0.72 : PIXEL_H * 0.56;
+      const targetX = clamp(
+        player.x + player.w * 0.5 + this.lookAheadX - PIXEL_W * 0.5,
+        0,
+        this.worldW - PIXEL_W
+      );
+      const targetY = clamp(
+        player.y + player.h * 0.5 - yBias + clamp(player.vy * 0.04, -12, 18),
+        0,
+        this.worldH - PIXEL_H
+      );
+
+      const smooth = 1 - Math.exp(-7.2 * dt);
+      this.x = lerp(this.x, targetX, smooth);
+      this.y = lerp(this.y, targetY, smooth);
+
+      if (this.shakeMag > 0.05) {
+        this.shakeX = (Math.random() * 2 - 1) * this.shakeMag;
+        this.shakeY = (Math.random() * 2 - 1) * this.shakeMag;
+        this.shakeMag *= Math.exp(-12 * dt);
+      } else {
+        this.shakeMag = 0;
+        this.shakeX = 0;
+        this.shakeY = 0;
+      }
+    }
+
+    getInterpX(alpha) {
+      return clamp(lerp(this.prevX, this.x, alpha) + this.shakeX, 0, this.worldW - PIXEL_W);
+    }
+
+    getInterpY(alpha) {
+      return clamp(lerp(this.prevY, this.y, alpha) + this.shakeY, 0, this.worldH - PIXEL_H);
+    }
+  }
+
+  // =========================================================================
+  // 4. MAIN GAME LOOP & STORY CAMPAIGN CONTROLLER
+  // =========================================================================
+  class Game {
+    constructor() {
+      this.displayCanvas = document.getElementById('displayCanvas');
+      this.displayCtx = this.displayCanvas.getContext('2d');
+
+      // 2px margin buffer enables 120Hz+ sub-pixel camera sliding while keeping pixels crisp
+      const pix = createOffscreen(PIXEL_W + 2, PIXEL_H + 2);
+      this.pixelCanvas = pix.canvas;
+      this.pixelCtx = pix.ctx;
+
+      this.assets = new AssetFactory();
+      this.assets.bakeAll();
+
+      this.audio = new AudioEngine();
+      this.verlet = new VerletSystem();
+      this.machinery = new MachinerySystem();
+      this.level = new LevelBuilder(this.assets, this.verlet, this.machinery);
+      this.particles = new ParticleSystem(this.level.worldW, this.level.worldH, this.level.palette);
+      this.lighting = new LightingEngine();
+
+      this.player = new Player(0, 0, this.assets);
+      this.camera = new Camera(this.level.worldW, this.level.worldH, 0, 0);
+
+      // Campaign & story progression state
+      this.time = 0;
+      this.runTime = 0;
+      this.accumulator = 0;
+      this.lastTime = performance.now();
+
+      this.sectorIndex = 0;
+      this.totalShardsCollected = 0;
+      this.totalLogsRead = new Set();
+      this.hintAlpha = 1.0;
+      this.bannerTimer = 0;
+      this.bannerText = '';
+
+      this.awakened = false;
+      this.wakeTimer = 0;
+      this.activeTerminal = null;
+
+      this.transitionState = 'none'; // 'none', 'fadeOut', 'fadeIn', 'respawnOut', 'respawnIn'
+      this.transitionAlpha = 0;
+      this.pendingSector = null;
+
+      this.finaleActive = false;
+      this.finaleTimer = 0;
+
+      this.input = {
+        left: false,
+        right: false,
+        down: false,
+        jumpHeld: false,
+        jumpPressed: false
+      };
+
+      this.loadSector(0, true);
+      this.bindInput();
+      this.handleResize();
+      window.addEventListener('resize', () => this.handleResize());
+      requestAnimationFrame((t) => this.loop(t));
+    }
+
+    loadSector(sectorIdx, isInitial = false) {
+      this.sectorIndex = sectorIdx;
+      this.level.build(sectorIdx);
+      this.particles.reset(this.level.worldW, this.level.worldH, this.level.palette);
+      this.audio.setBiome(this.level.biome);
+
+      this.player.resetPosition(this.level.spawn.x, this.level.spawn.y);
+      this.camera.snapTo(this.player.x, this.player.y);
+      this.activeTerminal = null;
+
+      if (isInitial) {
+        this.awakened = false;
+        this.wakeTimer = 0;
+        this.totalShardsCollected = 0;
+        this.totalLogsRead.clear();
+        this.runTime = 0;
+        this.finaleActive = false;
+        this.finaleTimer = 0;
+        this.hintAlpha = 1.0;
+      } else {
+        this.awakened = true;
+        this.showBanner(this.level.palette.name);
+      }
+    }
+
+    bindInput() {
+      const onKeyDown = (e) => {
+        this.audio.unlock();
+        const code = e.code;
+        if (code === 'ArrowLeft' || code === 'KeyA') this.input.left = true;
+        if (code === 'ArrowRight' || code === 'KeyD') this.input.right = true;
+        if (code === 'ArrowDown' || code === 'KeyS') this.input.down = true;
+        if (code === 'Space' || code === 'ArrowUp' || code === 'KeyW') {
+          if (!this.input.jumpHeld) this.input.jumpPressed = true;
+          this.input.jumpHeld = true;
+          e.preventDefault();
+        }
+        if (code === 'KeyM') {
+          this.audio.toggleMute();
+        }
+        if (code === 'KeyR') {
+          if (this.finaleActive) {
+            this.transitionState = 'fadeOut';
+            this.transitionAlpha = 0;
+            this.pendingSector = 0;
+            this.finaleActive = false;
+          } else if (this.transitionState === 'none' && this.awakened) {
+            this.triggerRespawn();
+          }
+        }
+      };
+
+      const onKeyUp = (e) => {
+        const code = e.code;
+        if (code === 'ArrowLeft' || code === 'KeyA') this.input.left = false;
+        if (code === 'ArrowRight' || code === 'KeyD') this.input.right = false;
+        if (code === 'ArrowDown' || code === 'KeyS') this.input.down = false;
+        if (code === 'Space' || code === 'ArrowUp' || code === 'KeyW') {
+          this.input.jumpHeld = false;
+        }
+      };
+
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('keyup', onKeyUp);
+      window.addEventListener('pointerdown', () => this.audio.unlock());
+    }
+
+    handleResize() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const targetAspect = 16 / 9;
+      let cw = vw;
+      let ch = Math.floor(vw / targetAspect);
+      if (ch > vh) {
+        ch = vh;
+        cw = Math.floor(vh * targetAspect);
+      }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.displayCanvas.style.width = `${cw}px`;
+      this.displayCanvas.style.height = `${ch}px`;
+      this.displayCanvas.width = Math.max(PIXEL_W, Math.round(cw * dpr));
+      this.displayCanvas.height = Math.max(PIXEL_H, Math.round(ch * dpr));
+    }
+
+    triggerRespawn() {
+      if (this.transitionState !== 'none') return;
+      this.transitionState = 'respawnOut';
+      this.transitionAlpha = 0;
+      this.audio.playLand(true);
+      this.particles.spawnCrystalBurst(this.player.x + 6, this.player.y + 9, ['#99f6ff', '#ffffff', '#3a78a8']);
+    }
+
+    stepPhysics(dt) {
+      this.time += dt;
+      if (!this.finaleActive) this.runTime += dt;
+
+      // Handle Awakening Sequence in Act I
+      if (!this.awakened) {
+        this.wakeTimer += dt;
+        if (this.wakeTimer >= 1.1) {
+          this.awakened = true;
+          this.audio.playTerminalBlip();
+          this.showBanner("UNIT-04 'PICO' ONLINE // SECTOR 04");
+        }
+      }
+
+      // Handle Sector & Respawn Transitions
+      if (this.transitionState === 'fadeOut') {
+        this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 2.1);
+        if (this.transitionAlpha >= 1) {
+          const target = this.pendingSector !== null ? this.pendingSector : 0;
+          this.loadSector(target, target === 0 && this.finaleTimer > 0);
+          this.finaleTimer = 0;
+          this.pendingSector = null;
+          this.transitionState = 'fadeIn';
+        }
+      } else if (this.transitionState === 'fadeIn') {
+        this.transitionAlpha = Math.max(0, this.transitionAlpha - dt * 2.1);
+        if (this.transitionAlpha <= 0) this.transitionState = 'none';
+      } else if (this.transitionState === 'respawnOut') {
+        this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 3.4);
+        if (this.transitionAlpha >= 1) {
+          const cp = this.player.checkpoint;
+          this.player.x = cp.x;
+          this.player.y = cp.y;
+          this.player.prevX = cp.x;
+          this.player.prevY = cp.y;
+          this.player.vx = 0;
+          this.player.vy = 0;
+          this.player.ridingPlatformId = null;
+          this.camera.snapTo(cp.x, cp.y);
+          this.transitionState = 'respawnIn';
+        }
+      } else if (this.transitionState === 'respawnIn') {
+        this.transitionAlpha = Math.max(0, this.transitionAlpha - dt * 3.4);
+        if (this.transitionAlpha <= 0) this.transitionState = 'none';
+      }
+
+      const canControl =
+        this.awakened &&
+        this.transitionState !== 'fadeOut' &&
+        this.transitionState !== 'respawnOut' &&
+        !this.finaleActive;
+
+      // 1. Update Machinery + Carry Player seamlessly (zero-slip riding)
+      this.machinery.update(dt, this.level, this.player, this.particles, this.audio, this.camera, () => {
+        if (this.transitionState === 'none') {
+          this.pendingSector = this.sectorIndex + 1;
+          this.transitionState = 'fadeOut';
+        }
+      });
+      if (canControl) {
+        this.machinery.carryPlayer(this.player, this.level);
+      }
+
+      // 2. Player Physics
+      this.player.update(dt, this.input, this.level, this.particles, this.audio, this.camera, canControl);
+      this.input.jumpPressed = false;
+
+      if (this.player.hasMoved && this.hintAlpha > 0) {
+        this.hintAlpha = Math.max(0, this.hintAlpha - dt * 0.45);
+      }
+
+      // 3. Verlet Physics, Particles & Camera
+      this.verlet.update(dt, this.time, this.player);
+      this.particles.update(dt, this.time, this.level, this.audio);
+      this.camera.update(dt, this.player, this.finaleActive);
+
+      const pcx = this.player.x + this.player.w * 0.5;
+      const pcy = this.player.y + this.player.h * 0.5;
+
+      // 4. Hazard Basin Collision Check (Sector 07 Coolant / Sector 09 Magma)
+      if (this.transitionState === 'none' && !this.finaleActive) {
+        for (const hz of this.level.hazards) {
+          if (pcx > hz.x && pcx < hz.x + hz.w && this.player.y + this.player.h > hz.y + 3) {
+            this.triggerRespawn();
+            break;
+          }
+        }
+      }
+
+      // 5. Collectible Shards
+      for (const sh of this.level.shards) {
+        if (sh.collected) continue;
+        if (Math.hypot(pcx - (sh.x + 6), pcy - (sh.y + 7)) < 16) {
+          sh.collected = true;
+          this.totalShardsCollected++;
+          const burstPal =
+            this.level.biome === 'sector07'
+              ? ['#4dffdb', '#ffffff', '#18b89a']
+              : this.level.biome === 'sector09'
+              ? ['#ffaa33', '#ffffff', '#ff5938']
+              : ['#ff1e42', '#ff8fa3', '#ffffff'];
+          this.particles.spawnCrystalBurst(sh.x + 6, sh.y + 7, burstPal);
+          this.camera.shake(1.6);
+          this.audio.playShardPickup(this.totalShardsCollected);
+        }
+      }
+
+      // 6. Interactive Lore Terminals & Checkpoint Save
+      let nearestTerm = null;
+      for (const tm of this.level.terminals) {
+        const dist = Math.hypot(pcx - (tm.x + 10), pcy - (tm.y + 12));
+        if (dist < 28) {
+          nearestTerm = tm;
+          if (!tm.read) {
+            tm.read = true;
+            this.totalLogsRead.add(tm.id);
+            this.audio.playTerminalBlip();
+            this.player.checkpoint = { x: tm.x + 4, y: tm.floorY - this.player.h };
+          }
+        }
+      }
+      this.activeTerminal = nearestTerm;
+
+      // 7. Sector Energy Core Activation
+      const orb = this.level.orb;
+      if (orb) {
+        orb.pulseTimer -= dt;
+        if (orb.pulseTimer <= 0) {
+          orb.pulseTimer = orb.activated ? 1.55 : 2.3;
+          this.particles.spawnOrbPulse(orb.x, orb.y, false, this.level.palette.orbColor);
+        }
+        if (Math.hypot(pcx - orb.x, pcy - orb.y) < 28 && !orb.activated) {
+          orb.activated = true;
+          orb.chargeAnim = 1.0;
+          this.player.checkpoint = { x: this.player.x, y: this.player.y };
+          this.particles.spawnOrbPulse(orb.x, orb.y, true, this.level.palette.orbColor);
+          this.camera.shake(3.4);
+          this.audio.playOrbActivate();
+          const msg =
+            this.sectorIndex === 0
+              ? 'CORE RESTORED // EAST ELEVATOR UNLOCKED'
+              : this.sectorIndex === 1
+              ? 'HYDRO-CORE ONLINE // GEOTHERMAL LIFT READY'
+              : 'APEX CORE CHARGED // ACTIVATE RELAY SPIRE';
+          this.showBanner(msg);
+        }
+        if (orb.chargeAnim > 0) orb.chargeAnim = Math.max(0, orb.chargeAnim - dt * 0.8);
+      }
+
+      // 8. Sector 09 Surface Broadcast Relay Finale
+      if (this.level.exitGate && !this.finaleActive) {
+        const gate = this.level.exitGate;
+        if (Math.hypot(pcx - gate.cx, pcy - gate.cy) < 24) {
+          gate.activated = true;
+          if (orb && !orb.activated) orb.activated = true;
+          this.finaleActive = true;
+          this.finaleTimer = 0;
+          this.camera.shake(3.8);
+          this.audio.playSurfaceFinale();
+          this.particles.spawnOrbPulse(gate.cx, gate.cy, true, '#99f6ff');
+          this.showBanner('SURFACE RELAY ONLINE // NETWORK RESTORED');
+        }
+      }
+
+      if (this.finaleActive) {
+        this.finaleTimer += dt;
+        if (Math.random() < dt * 14) {
+          this.particles.spawnParticle(
+            this.level.exitGate.cx + (Math.random() - 0.5) * 40,
+            this.level.exitGate.cy + 10,
+            (Math.random() - 0.5) * 20,
+            -45 - Math.random() * 55,
+            0.9,
+            Math.random() < 0.5 ? '#ffffff' : '#80e5ff',
+            -10,
+            1
+          );
+        }
+      }
+
+      if (this.bannerTimer > 0) this.bannerTimer -= dt;
+    }
+
+    showBanner(msg) {
+      this.bannerText = msg;
+      this.bannerTimer = 3.5;
+    }
+
+    // -----------------------------------------------------------------------
+    // HYBRID PIXEL-ART + HD LIGHTING + SUB-PIXEL INTERPOLATED RENDERER
+    // -----------------------------------------------------------------------
+    render(alpha) {
+      const pctx = this.pixelCtx;
+      const camInterpX = this.camera.getInterpX(alpha);
+      const camInterpY = this.camera.getInterpY(alpha);
+      const intCamX = Math.floor(camInterpX);
+      const intCamY = Math.floor(camInterpY);
+      const fracX = camInterpX - intCamX;
+      const fracY = camInterpY - intCamY;
+
+      const biome = this.level.biome;
+      const bg = this.assets.bgLayers[biome];
+
+      pctx.imageSmoothingEnabled = false;
+      pctx.clearRect(0, 0, PIXEL_W + 2, PIXEL_H + 2);
+
+      // LAYER 0: Abyssal Atmospheric Backdrop (or Dawn Sky during Surface Finale)
+      pctx.drawImage(bg.backdrop, 0, 0, PIXEL_W + 2, PIXEL_H + 2);
+      if (this.finaleActive) {
+        const skyAlpha = clamp(this.finaleTimer / 2.4, 0, 0.92);
+        pctx.globalAlpha = skyAlpha;
+        pctx.drawImage(this.assets.surfaceBackdrop, 0, 0, PIXEL_W + 2, PIXEL_H + 2);
+        pctx.globalAlpha = 1;
+      }
+
+      // LAYER 1-3: Multi-Layer Parallax Architecture, Brick Vaults & Foliage
+      this.drawTiledParallax(pctx, bg.megaArch, camInterpX * 0.15, camInterpY * 0.15);
+      this.drawTiledParallax(pctx, bg.brickVault, camInterpX * 0.35, camInterpY * 0.35);
+      this.drawTiledParallax(pctx, bg.foliage, camInterpX * 0.7, camInterpY * 0.55);
+
+      // LAYER 4a: Background Wall Pipes & Recessed Spinning Exhaust Turbines
+      for (const pipe of this.level.pipes) {
+        const px = Math.round(pipe.x - intCamX);
+        const py = Math.round(pipe.y - intCamY);
+        if (px > -40 && px < PIXEL_W + 40 && py > -60 && py < PIXEL_H + 60) {
+          pctx.drawImage(pipe.sprite, px, py);
+        }
+      }
+      this.machinery.renderBackground(pctx, intCamX, intCamY, this.assets);
+
+      // LAYER 4b: Auto-Tiled Terrain & Steel Truss Bridges
+      const minCol = Math.max(0, Math.floor(intCamX / TILE_SIZE) - 1);
+      const maxCol = Math.min(this.level.cols - 1, Math.ceil((intCamX + PIXEL_W + 2) / TILE_SIZE) + 1);
+      const minRow = Math.max(0, Math.floor(intCamY / TILE_SIZE) - 1);
+      const maxRow = Math.min(this.level.rows - 1, Math.ceil((intCamY + PIXEL_H + 2) / TILE_SIZE) + 1);
+      const corners = this.assets.cornerDots[biome];
+
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const cell = this.level.grid[r][c];
+          const wx = c * TILE_SIZE - intCamX;
+          const wy = r * TILE_SIZE - intCamY;
+          if (cell === '#') {
+            const mask = this.level.masks[r][c];
+            const v = this.level.variants[r][c];
+            pctx.drawImage(this.assets.getStoneTile(biome, mask, v), wx - 2, wy - 6);
+
+            if ((mask & 9) === 9 && !this.level.isSolidAtTile(c - 1, r - 1)) pctx.drawImage(corners.NW, wx, wy);
+            if ((mask & 3) === 3 && !this.level.isSolidAtTile(c + 1, r - 1)) pctx.drawImage(corners.NE, wx + 12, wy);
+            if ((mask & 6) === 6 && !this.level.isSolidAtTile(c + 1, r + 1)) pctx.drawImage(corners.SE, wx + 12, wy + 12);
+            if ((mask & 12) === 12 && !this.level.isSolidAtTile(c - 1, r + 1)) pctx.drawImage(corners.SW, wx, wy + 12);
+          } else if (cell === 'T') {
+            pctx.drawImage(this.assets.getTrussTile(biome, this.level.variants[r][c]), wx, wy);
+          }
+        }
+      }
+
+      // LAYER 4c: Anchored Props (Crates, Crystals/Mushrooms, Terminals, Signs, Lamps)
+      for (const cr of this.level.crates) {
+        pctx.drawImage(cr.sprite, Math.round(cr.x - intCamX), Math.round(cr.y - intCamY));
+      }
+
+      for (const crystal of this.level.crystals) {
+        pctx.drawImage(crystal.sprite, Math.round(crystal.x - intCamX), Math.round(crystal.y - intCamY));
+      }
+
+      // Lore CRT Terminals with flickering phosphor screens
+      for (const tm of this.level.terminals) {
+        const tx = Math.round(tm.x - intCamX);
+        const ty = Math.round(tm.y - intCamY);
+        pctx.drawImage(tm.sprite, tx, ty);
+        const sr = tm.sprite.screenRect;
+        const active = this.activeTerminal && this.activeTerminal.id === tm.id;
+        const flk = Math.sin(this.time * 18 + tm.x) > -0.7;
+        pctx.fillStyle = active ? '#6ee89a' : (tm.read ? '#2a8f63' : '#1b5944');
+        if (flk) {
+          pctx.fillRect(tx + sr.x + 1, ty + sr.y + 1, sr.w - 2, 1);
+          pctx.fillRect(tx + sr.x + 1, ty + sr.y + 3, sr.w - 4, 1);
+          pctx.fillRect(tx + sr.x + 1, ty + sr.y + 5, sr.w - 3, 1);
+        }
+      }
+
+      // Surface Broadcast Relay Spire
+      if (this.level.exitGate) {
+        const gate = this.level.exitGate;
+        const gx = Math.round(gate.x - intCamX);
+        const gy = Math.round(gate.y - intCamY);
+        pctx.drawImage(gate.sprite, gx, gy);
+        const pulseCol = gate.activated ? '#ffffff' : (this.level.orb && this.level.orb.activated ? '#ffaa33' : '#7a3324');
+        pctx.fillStyle = pulseCol;
+        pctx.fillRect(gx + 14, gy + 20, 6, 4);
+        pctx.fillRect(gx + 16, gy - 1, 2, 2);
+      }
+
+      // Anchored Signs + Suspension Rods + Flickering Fluorescent Tubes
+      for (const sign of this.level.signs) {
+        const sx = Math.round(sign.x - intCamX);
+        const sy = Math.round(sign.y - intCamY);
+        if (sign.rods) {
+          for (const rod of sign.rods) {
+            const rx = Math.round(rod.x - intCamX);
+            const topY = Math.round(rod.topY - intCamY);
+            const botY = Math.round(rod.botY - intCamY);
+            pctx.drawImage(this.assets.anchorPlate, rx - 5, topY - 1);
+            pctx.fillStyle = '#0c111a';
+            pctx.fillRect(rx - 1, topY, 3, Math.max(0, botY - topY));
+            pctx.fillStyle = '#4c6482';
+            pctx.fillRect(rx, topY, 1, Math.max(0, botY - topY));
+          }
+        }
+        pctx.drawImage(sign.sprite, sx, sy);
+
+        const flk = this.lighting.getFlicker(this.time, sign.flickerSeed, true);
+        for (const tb of sign.sprite.tubeBounds) {
+          pctx.fillStyle = flk > 0.72 ? '#ffffff' : sign.sprite.glowColor;
+          pctx.fillRect(sx + tb.x, sy + tb.y, tb.w, tb.h);
+          pctx.fillStyle = sign.sprite.glowColor;
+          pctx.fillRect(sx + tb.x + 1, sy + tb.y + tb.h, tb.w - 2, 1);
+        }
+      }
+
+      // Conduit indicator lights along station deck
+      if (this.level.orb) {
+        for (const cl of this.level.conduitLights) {
+          const lx = Math.round(cl.x - intCamX);
+          const ly = Math.round(cl.y - intCamY);
+          pctx.fillStyle = '#182233';
+          pctx.fillRect(lx - 2, ly - 3, 4, 3);
+          pctx.fillStyle = this.level.orb.activated ? '#ffffff' : '#3d2147';
+          pctx.fillRect(lx - 1, ly - 2, 2, 1);
+        }
+      }
+
+      // Anchored Lamps (Ceiling Flange Plate or Wall Cantilever Arm)
+      for (const lamp of this.level.lamps) {
+        const lx = Math.round(lamp.x - intCamX);
+        const ly = Math.round(lamp.y - intCamY);
+        const ax = Math.round(lamp.anchorX - intCamX);
+        const ay = Math.round(lamp.anchorY - intCamY);
+
+        if (lamp.anchorType === 'ceiling') {
+          pctx.drawImage(this.assets.anchorPlate, ax - 5, ay - 1);
+          pctx.fillStyle = '#141c29';
+          pctx.fillRect(lx + 9, ay, 2, Math.max(0, ly - ay + 2));
+        } else if (lamp.anchorType === 'wallLeft') {
+          pctx.drawImage(this.assets.wallBracketLeft, ax - 1, ay);
+        } else if (lamp.anchorType === 'wallRight') {
+          pctx.drawImage(this.assets.wallBracketRight, ax - 13, ay);
+        }
+        pctx.drawImage(lamp.sprite, lx, ly);
+      }
+
+      // Suspended Energy Core Orb
+      if (this.level.orb) {
+        const orb = this.level.orb;
+        const ox = Math.round(orb.x - intCamX);
+        const oy = Math.round(orb.y + Math.sin(this.time * 2.5) * 2.2 - intCamY);
+        const topY = Math.round(orb.anchorY - intCamY);
+        pctx.drawImage(this.assets.anchorPlate, ox - 5, topY - 1);
+        for (let y = topY + 2; y < oy - 8; y += 3) {
+          pctx.fillStyle = y % 6 === 0 ? '#3c506b' : '#1b2636';
+          pctx.fillRect(ox - 1, y, 2, 2);
+        }
+        pctx.drawImage(orb.sprite, ox - 16, oy - 16);
+        for (let i = 0; i < 4; i++) {
+          const ang = this.time * (orb.activated ? 4.2 : 2.1) + (i * Math.PI) / 2;
+          const rx = Math.round(ox + Math.cos(ang) * 12);
+          const ry = Math.round(oy + Math.sin(ang) * 12);
+          pctx.fillStyle = orb.activated ? '#99f6ff' : '#ffffff';
+          pctx.fillRect(rx, ry, 2, 2);
+        }
+      }
+
+      // Collectible Shards
+      for (const sh of this.level.shards) {
+        if (sh.collected) continue;
+        const bob = Math.round(Math.sin(this.time * 3.4 + sh.phase) * 2.2);
+        const fIdx = Math.floor((this.time * 5 + sh.phase) % this.assets.shardFrames.length);
+        pctx.drawImage(
+          this.assets.shardFrames[fIdx],
+          Math.round(sh.x - intCamX),
+          Math.round(sh.y + bob - intCamY)
+        );
+      }
+
+      // LAYER 4d: Moving Machinery (Elevators, Pulleys, Counterweights, Gondolas, Vents)
+      this.machinery.renderForeground(pctx, intCamX, intCamY, this.assets, this.time, alpha);
+
+      // LAYER 4e: Real-Time Puddle Reflections & Shimmering Water/Coolant/Magma Basins
+      this.renderPuddlesAndReflections(pctx, intCamX, intCamY, alpha);
+
+      // LAYER 4f: Verlet Chains, Cables & Interactive Grass/Spore Blades
+      this.verlet.render(pctx, intCamX, intCamY, this.assets, biome);
+
+      // LAYER 4g: Protagonist UNIT-04 "PICO"
+      this.player.render(pctx, intCamX, intCamY, alpha, this.awakened, this.wakeTimer, false);
+
+      // LAYER 5: Atmospheric Particles
+      this.particles.render(pctx, intCamX, intCamY, this.time, this.level);
+
+      // Interactive Floating Lore Window on Pixel Canvas (or Crisp HUD)
+      this.renderWorldTooltips(pctx, intCamX, intCamY);
+
+      // ---------------------------------------------------------------------
+      // COMPOSITE PIXEL BUFFER -> HD DISPLAY CANVAS (SUB-PIXEL SMOOTHNESS!)
+      // ---------------------------------------------------------------------
+      const dctx = this.displayCtx;
+      const dispW = this.displayCanvas.width;
+      const dispH = this.displayCanvas.height;
+      const sxScale = dispW / PIXEL_W;
+      const syScale = dispH / PIXEL_H;
+
+      dctx.clearRect(0, 0, dispW, dispH);
+      dctx.imageSmoothingEnabled = false;
+      dctx.drawImage(
+        this.pixelCanvas,
+        -fracX * sxScale,
+        -fracY * syScale,
+        (PIXEL_W + 2) * sxScale,
+        (PIXEL_H + 2) * syScale
+      );
+
+      // LAYER 6: Smooth HD Lighting, Visor Headlamp, Turbine Slicing, Blooms & Vignette
+      this.lighting.render(
+        dctx,
+        dispW,
+        dispH,
+        camInterpX,
+        camInterpY,
+        this.time,
+        this.level,
+        this.player,
+        {
+          x: lerp(this.player.prevX, this.player.x, alpha),
+          y: lerp(this.player.prevY, this.player.y, alpha)
+        },
+        {
+          alpha,
+          awakened: this.awakened,
+          finaleActive: this.finaleActive
+        }
+      );
+
+      // LAYER 7: Extreme Blurred Foreground Depth-of-Field Framing (1.3x Parallax)
+      this.renderBlurredForeground(dctx, dispW, dispH, camInterpX, camInterpY);
+
+      // Minimalist Diegetic HUD, Transition Fade & Surface Finale Stats
+      this.renderHUDAndOverlays(dctx, dispW, dispH);
+    }
+
+    renderPuddlesAndReflections(ctx, intCamX, intCamY, alpha) {
+      const pal = this.level.palette;
+      const prx = lerp(this.player.prevX, this.player.x, alpha);
+      const pry = lerp(this.player.prevY, this.player.y, alpha);
+
+      for (const pd of this.level.puddles) {
+        const px = Math.round(pd.x - intCamX);
+        const py = Math.round(pd.y - intCamY);
+        if (px + pd.w < 0 || px > PIXEL_W + 2 || py + pd.h < 0 || py > PIXEL_H + 2) continue;
+
+        // 1. Clipped Real-Time Flipped Wave-Distorted Reflections
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(px, py, pd.w, pd.h);
+        ctx.clip();
+
+        // Reflected glowing crystals / mushrooms
+        ctx.globalAlpha = 0.36;
+        for (const cr of this.level.crystals) {
+          const cx = cr.x + cr.sprite.width * 0.5;
+          if (cx >= pd.x - 16 && cx <= pd.x + pd.w + 16 && Math.abs(cr.y + cr.sprite.height - pd.y) < 55) {
+            const wave = Math.round(Math.sin(this.time * 4.2 + cr.x) * 1.3);
+            ctx.save();
+            ctx.translate(Math.round(cr.x - intCamX + wave), Math.round(2 * pd.y - (cr.y + cr.sprite.height) - intCamY + cr.sprite.height));
+            ctx.scale(1, -1);
+            ctx.drawImage(cr.sprite, 0, 0);
+            ctx.restore();
+          }
+        }
+
+        // Reflected gondola warm lanterns & lamps
+        if (this.level.machinery) {
+          for (const g of this.level.machinery.gondolas) {
+            const gx = lerp(g.prevX, g.x, alpha) + 22;
+            const gy = lerp(g.prevY, g.y, alpha) - 7;
+            if (gx >= pd.x - 20 && gx <= pd.x + pd.w + 20) {
+              const rx = Math.round(gx - intCamX + Math.sin(this.time * 5.1) * 1.6);
+              ctx.fillStyle = '#ffaa33';
+              ctx.fillRect(rx - 2, py + 1, 5, 3);
+              ctx.fillStyle = '#fff3d6';
+              ctx.fillRect(rx - 1, py + 2, 3, 2);
+            }
+          }
+        }
+
+        // Reflected protagonist robot ("PICO") when standing/jumping near basin
+        if (prx + 12 >= pd.x - 8 && prx <= pd.x + pd.w + 8 && Math.abs(pry + 18 - pd.y) < 38) {
+          const frame = this.player.getRenderFrame(this.awakened, this.wakeTimer);
+          const distFromSurface = Math.max(0, pd.y - (pry + 18));
+          const wave = Math.round(Math.sin(this.time * 6.5) * 1.4);
+          const refFootX = Math.round(prx + 6 - intCamX + wave);
+          const refFootY = Math.round(py + distFromSurface);
+          ctx.save();
+          ctx.translate(refFootX, refFootY);
+          ctx.scale(this.player.facing, -1);
+          ctx.drawImage(frame, -12, -22);
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // 2. Water / Coolant / Magma Basin Fill + Shimmering Fresnel Surface Highlights
+        ctx.fillStyle = pal.waterColor;
+        ctx.fillRect(px, py, pd.w, pd.h);
+        for (let x = 0; x < pd.w; x += 4) {
+          const wave = Math.sin(this.time * 2.6 + x * 0.25) > 0.22;
+          ctx.fillStyle = wave ? pal.waterHighlight : pal.waterMid;
+          ctx.fillRect(px + x, py, 3, 1);
+        }
+      }
+    }
+
+    renderWorldTooltips(ctx, intCamX, intCamY) {
+      // 1. Floating Lore Terminal Window (non-blocking, crisp pixel log box)
+      if (this.activeTerminal) {
+        const tm = this.activeTerminal;
+        const lines = [tm.title, ...tm.lines];
+        let maxW = 0;
+        for (const l of lines) maxW = Math.max(maxW, measurePixelText(l));
+        const boxW = maxW + 14;
+        const boxH = lines.length * 8 + 10;
+        const tx = clamp(Math.round(tm.x + 10 - intCamX - boxW * 0.5), 6, PIXEL_W - boxW - 6);
+        const ty = clamp(Math.round(tm.y - intCamY - boxH - 6), 6, PIXEL_H - boxH - 6);
+
+        ctx.fillStyle = 'rgba(4, 10, 18, 0.9)';
+        ctx.fillRect(tx, ty, boxW, boxH);
+        ctx.fillStyle = '#38a86b';
+        ctx.fillRect(tx, ty, boxW, 1);
+        ctx.fillRect(tx, ty + boxH - 1, boxW, 1);
+        ctx.fillRect(tx, ty, 1, boxH);
+        ctx.fillRect(tx + boxW - 1, ty, 1, boxH);
+
+        drawPixelText(ctx, tm.title, tx + 7, ty + 5, '#6ee89a', '#030408');
+        for (let i = 0; i < tm.lines.length; i++) {
+          drawPixelText(ctx, tm.lines[i], tx + 7, ty + 14 + i * 8, '#dce9fa', '#030408');
+        }
+      }
+
+      // 2. Exit Elevator Lock / Ready Hint when standing near lift
+      for (const e of this.machinery.elevators) {
+        if (e.mode !== 'exit') continue;
+        const dist = Math.hypot(this.player.x + 6 - (e.x + 24), this.player.y + 18 - e.y);
+        if (dist < 42 && e.state !== 'ascending_exit') {
+          const msg = e.unlocked ? 'STEP ON LIFT TO ASCEND' : 'CORE LOCKED - RESTORE ORB';
+          const col = e.unlocked ? '#6ee89a' : '#ff66d9';
+          const mw = measurePixelText(msg) + 10;
+          const mx = clamp(Math.round(e.x + 24 - intCamX - mw * 0.5), 4, PIXEL_W - mw - 4);
+          const my = clamp(Math.round(e.y - intCamY - 26), 6, PIXEL_H - 16);
+          ctx.fillStyle = 'rgba(4, 8, 16, 0.85)';
+          ctx.fillRect(mx, my, mw, 10);
+          drawPixelText(ctx, msg, mx + 5, my + 2, col, '#030408');
+        }
+      }
+    }
+
+    drawTiledParallax(ctx, img, ox, oy) {
+      const w = img.width;
+      const h = img.height;
+      const startX = -((Math.floor(ox) % w + w) % w);
+      const startY = -((Math.floor(oy) % h + h) % h);
+      for (let y = startY; y < PIXEL_H + 2; y += h) {
+        for (let x = startX; x < PIXEL_W + 2; x += w) {
+          ctx.drawImage(img, x, y);
+        }
+      }
+    }
+
+    renderBlurredForeground(dctx, dispW, dispH, camX, camY) {
+      const sxScale = dispW / PIXEL_W;
+      const syScale = dispH / PIXEL_H;
+      const pad = 14;
+      const fgX = camX * 1.3;
+      const fgY = camY * 1.3;
+
+      dctx.save();
+      dctx.imageSmoothingEnabled = true;
+
+      const topW = 260;
+      const startTop = -((Math.floor(fgX) % (topW * 2) + topW * 2) % (topW * 2));
+      for (let idx = 0, x = startTop; x < PIXEL_W + topW; x += topW, idx++) {
+        const chunk = this.assets.dofTopChunks[idx % this.assets.dofTopChunks.length];
+        dctx.drawImage(
+          chunk,
+          (x - pad) * sxScale,
+          (-pad - (fgY % 12) * 0.25) * syScale,
+          chunk.width * sxScale,
+          chunk.height * syScale
+        );
+      }
+
+      const botW = 260;
+      const startBot = -((Math.floor(fgX + 90) % (botW * 2) + botW * 2) % (botW * 2));
+      for (let idx = 0, x = startBot; x < PIXEL_W + botW; x += botW, idx++) {
+        const chunk = this.assets.dofBottomChunks[idx % this.assets.dofBottomChunks.length];
+        dctx.drawImage(
+          chunk,
+          (x - pad) * sxScale,
+          (PIXEL_H - 36 - pad) * syScale,
+          chunk.width * sxScale,
+          chunk.height * syScale
+        );
+      }
+
+      const spire = this.assets.dofSideSpire;
+      const sideBob = -((fgY * 0.3) % 60);
+      dctx.drawImage(spire, (-18 - pad) * sxScale, (sideBob - pad) * syScale, spire.width * sxScale, spire.height * syScale);
+      dctx.save();
+      dctx.translate(dispW, 0);
+      dctx.scale(-1, 1);
+      dctx.drawImage(spire, (-18 - pad) * sxScale, (65 + sideBob - pad) * syScale, spire.width * sxScale, spire.height * syScale);
+      dctx.restore();
+
+      dctx.restore();
+    }
+
+    renderHUDAndOverlays(dctx, dispW, dispH) {
+      const scale = dispW / PIXEL_W;
+      dctx.save();
+      dctx.imageSmoothingEnabled = false;
+      dctx.scale(scale, scale);
+
+      // Top-left Sector Tag + Mute Tag
+      const secTitle = `SEC-0${this.sectorIndex === 0 ? '4' : this.sectorIndex === 1 ? '7' : '9'}`;
+      drawPixelText(dctx, secTitle, 8, 8, 'rgba(200, 225, 250, 0.58)', '#030408');
+      drawPixelText(dctx, this.audio.muted ? 'M:OFF' : 'M:SFX', 42, 8, 'rgba(180, 205, 235, 0.38)');
+
+      // Top-right Shard Counter + Sector Core Status
+      const hudX = PIXEL_W - 64;
+      const hudY = 8;
+      dctx.fillStyle = 'rgba(6, 10, 20, 0.55)';
+      dctx.fillRect(hudX - 4, hudY - 3, 60, 12);
+      dctx.drawImage(this.assets.shardFrames[0], hudX - 2, hudY - 4, 9, 10);
+      drawPixelText(dctx, `${this.totalShardsCollected}/15`, hudX + 9, hudY + 1, '#eef4ff', '#030408');
+
+      const orbOn = this.level.orb && this.level.orb.activated;
+      dctx.fillStyle = orbOn ? this.level.palette.orbColor : '#3a4a63';
+      dctx.fillRect(hudX + 41, hudY + 1, 5, 5);
+      if (orbOn) {
+        dctx.fillStyle = '#ffffff';
+        dctx.fillRect(hudX + 42, hudY + 2, 3, 3);
+      }
+
+      // Fading Controls Hint
+      if (this.hintAlpha > 0.02 && this.awakened) {
+        dctx.globalAlpha = this.hintAlpha * 0.85;
+        const hint = 'WASD / ARROWS MOVE • SPACE JUMP • S DROP • R CHECKPOINT';
+        const hw = measurePixelText(hint) + 10;
+        const hx = Math.round((PIXEL_W - hw) * 0.5);
+        const hy = PIXEL_H - 22;
+        dctx.fillStyle = 'rgba(4, 8, 18, 0.68)';
+        dctx.fillRect(hx, hy - 3, hw, 11);
+        drawPixelText(dctx, hint, hx + 5, hy, '#dce9fa', '#030408');
+        dctx.globalAlpha = 1;
+      }
+
+      // Event / Sector Title Banner
+      if (this.bannerTimer > 0) {
+        const alpha = clamp(Math.min(this.bannerTimer, 3.5 - this.bannerTimer + 0.6) * 1.4, 0, 1);
+        dctx.globalAlpha = alpha;
+        const bw = measurePixelText(this.bannerText) + 14;
+        const bx = Math.round((PIXEL_W - bw) * 0.5);
+        const by = 22;
+        dctx.fillStyle = 'rgba(8, 12, 26, 0.82)';
+        dctx.fillRect(bx, by - 3, bw, 11);
+        dctx.fillStyle = this.level.palette.orbColor;
+        dctx.fillRect(bx, by - 3, bw, 1);
+        drawPixelText(dctx, this.bannerText, bx + 7, by, '#ffffff', '#030408');
+        dctx.globalAlpha = 1;
+      }
+
+      // Surface Broadcast Finale Summary Card
+      if (this.finaleActive && this.finaleTimer > 1.4) {
+        const cardAlpha = clamp((this.finaleTimer - 1.4) * 1.2, 0, 1);
+        dctx.globalAlpha = cardAlpha;
+        const mins = String(Math.floor(this.runTime / 60)).padStart(2, '0');
+        const secs = String(Math.floor(this.runTime % 60)).padStart(2, '0');
+        const rows = [
+          'SURFACE RELAY ONLINE',
+          'ALL SECTORS SYNCHRONIZED',
+          `SHARDS RECOVERED: ${this.totalShardsCollected} / 15`,
+          `DATA LOGS DECODED: ${this.totalLogsRead.size} / 6`,
+          `ASCENT TIME: ${mins}:${secs}`,
+          '[R] REPLAY CAMPAIGN'
+        ];
+        const cardW = 166;
+        const cardH = 74;
+        const cx = Math.round((PIXEL_W - cardW) * 0.5);
+        const cy = 42;
+        dctx.fillStyle = 'rgba(4, 9, 20, 0.88)';
+        dctx.fillRect(cx, cy, cardW, cardH);
+        dctx.fillStyle = '#99f6ff';
+        dctx.fillRect(cx, cy, cardW, 1);
+        dctx.fillRect(cx, cy + cardH - 1, cardW, 1);
+
+        drawPixelText(dctx, rows[0], cx + Math.round((cardW - measurePixelText(rows[0])) * 0.5), cy + 7, '#ffffff', '#030408');
+        drawPixelText(dctx, rows[1], cx + Math.round((cardW - measurePixelText(rows[1])) * 0.5), cy + 16, '#99f6ff', '#030408');
+        drawPixelText(dctx, rows[2], cx + 14, cy + 29, '#ff8fa3', '#030408');
+        drawPixelText(dctx, rows[3], cx + 14, cy + 38, '#6ee89a', '#030408');
+        drawPixelText(dctx, rows[4], cx + 14, cy + 47, '#ffe38f', '#030408');
+        drawPixelText(dctx, rows[5], cx + Math.round((cardW - measurePixelText(rows[5])) * 0.5), cy + 60, '#dce9fa', '#030408');
+        dctx.globalAlpha = 1;
+      }
+
+      // Awakening Dim Fade + Smooth Transition Overlay
+      let blackAlpha = this.transitionAlpha;
+      if (!this.awakened && this.wakeTimer < 0.7) {
+        blackAlpha = Math.max(blackAlpha, clamp(1 - this.wakeTimer / 0.7, 0, 0.88));
+      }
+      if (blackAlpha > 0.01) {
+        dctx.fillStyle = `rgba(3, 4, 8, ${blackAlpha})`;
+        dctx.fillRect(0, 0, PIXEL_W, PIXEL_H);
+      }
+
+      dctx.restore();
+    }
+
+    loop(now) {
+      const frameDt = Math.min(0.05, Math.max(0, (now - this.lastTime) / 1000));
+      this.lastTime = now;
+      this.accumulator += frameDt;
+
+      while (this.accumulator >= FIXED_DT) {
+        this.stepPhysics(FIXED_DT);
+        this.accumulator -= FIXED_DT;
+      }
+
+      const alpha = this.accumulator / FIXED_DT;
+      this.render(alpha);
+      requestAnimationFrame((t) => this.loop(t));
+    }
+  }
+
+  new Game();
+})();
+</script>
+</body>
+</html>
