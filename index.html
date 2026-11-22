@@ -115,42 +115,164 @@
   } = GAME;
 
   // =========================================================================
-  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (ALL 7 BIOMES + NEW MECHANICS)
+  // 1. DUAL AUDIO ENGINE: STREAMING AMBIENCE + WEB AUDIO SPATIAL MACHINE HUM
   // =========================================================================
   class AudioEngine {
     constructor() {
       this.ctx = null;
       this.master = null;
-      this.droneFilter = null;
       this.muted = false;
       this.started = false;
       this.noiseBuffer = null;
-      this.currentBiome = 'sector04';
+
+      // HTML5 streaming audio channels (looping music & environment)
+      this.musicTrack = new Audio();
+      this.musicTrack.loop = true;
+      this.envTrack = new Audio();
+      this.envTrack.loop = true;
+      this.currentSector = -1;
+
+      // Level Audio Mapping (1-7)
+      this.LEVEL_AUDIO = [
+        { music: 'audio/1.mp3', env: 'audio/drops.wav' },  // Level 1: Sector 04
+        { music: 'audio/2.mp3', env: 'audio/drops.wav' },  // Level 2: Cryo
+        { music: 'audio/3.mp3', env: 'audio/drops.wav' },  // Level 3: Sector 07
+        { music: 'audio/4.mp3', env: 'audio/lava.wav' },   // Level 4: Amber Reef
+        { music: 'audio/6.mp3', env: 'audio/lava.wav' },   // Level 5: Sector 09 (magma)
+        { music: 'audio/6.mp3', env: 'audio/wind.wav' },   // Level 6: Viaduct
+        { music: 'audio/1.mp3', env: 'audio/nature.wav' }  // Level 7: Atrium
+      ];
+
+      // Spatial Machine Hum nodes (Web Audio)
+      this.humOsc = null;
+      this.humGain = null;
+      this.humPan = null;
     }
 
     unlock() {
-      if (this.started) {
-        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-        return;
+      if (!this.started) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          try {
+            this.ctx = new AudioCtx();
+            this.master = this.ctx.createGain();
+            this.master.gain.value = this.muted ? 0 : 0.34;
+            this.master.connect(this.ctx.destination);
+
+            const len = this.ctx.sampleRate * 1.5;
+            this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+            const data = this.noiseBuffer.getChannelData(0);
+            for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+            this.initSpatialHum();
+            this.started = true;
+          } catch (e) {}
+        }
       }
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      try {
-        this.ctx = new AudioCtx();
-        this.master = this.ctx.createGain();
-        this.master.gain.value = this.muted ? 0 : 0.34;
-        this.master.connect(this.ctx.destination);
 
-        const len = this.ctx.sampleRate * 1.5;
-        this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-        const data = this.noiseBuffer.getChannelData(0);
-        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
 
-        this.startAmbientDrone();
-        this.setBiome(this.currentBiome);
-        this.started = true;
-      } catch (e) {
-        // Ignore audio errors cleanly
+      // Resume HTML5 tracks once browser autoplay is unlocked
+      if (this.musicTrack && this.musicTrack.paused && this.musicTrack.src) {
+        this.musicTrack.play().catch(() => {});
+      }
+      if (this.envTrack && this.envTrack.paused && this.envTrack.src) {
+        this.envTrack.play().catch(() => {});
+      }
+    }
+
+    initSpatialHum() {
+      if (!this.ctx) return;
+      // Synthesized heavy industrial mechanical hum (60Hz + 120Hz filtered rumble)
+      this.humOsc = this.ctx.createOscillator();
+      this.humOsc.type = 'sawtooth';
+      this.humOsc.frequency.value = 58;
+
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 180;
+
+      this.humGain = this.ctx.createGain();
+      this.humGain.gain.value = 0;
+
+      // Stereo panner for spatial left/right panning
+      if (this.ctx.createStereoPanner) {
+        this.humPan = this.ctx.createStereoPanner();
+        this.humPan.pan.value = 0;
+        this.humOsc.connect(lp);
+        lp.connect(this.humGain);
+        this.humGain.connect(this.humPan);
+        this.humPan.connect(this.master);
+      } else {
+        this.humOsc.connect(lp);
+        lp.connect(this.humGain);
+        this.humGain.connect(this.master);
+      }
+      this.humOsc.start();
+    }
+
+    playSectorAudio(sectorIdx) {
+      this.currentSector = sectorIdx;
+      const cfg = this.LEVEL_AUDIO[sectorIdx] || this.LEVEL_AUDIO[0];
+
+      // Switch soundtrack if different
+      if (cfg.music && !this.musicTrack.src.endsWith(cfg.music)) {
+        this.musicTrack.src = cfg.music;
+        this.musicTrack.volume = this.muted ? 0 : 0.40;
+        this.musicTrack.play().catch(() => {});
+      }
+
+      // Switch environment ambience (drops, lava, wind, nature)
+      if (cfg.env && !this.envTrack.src.endsWith(cfg.env)) {
+        this.envTrack.src = cfg.env;
+        this.envTrack.volume = this.muted ? 0 : 0.45;
+        this.envTrack.play().catch(() => {});
+      }
+    }
+
+    updateSpatialHum(player, level) {
+      if (!this.humGain || !this.started || this.muted) return;
+
+      const px = player.x + player.w * 0.5;
+      const py = player.y + player.h * 0.5;
+      let closestDist = Infinity;
+      let closestRelX = 0;
+
+      // Check proximity to all machines on the map
+      if (level.machinery) {
+        const m = level.machinery;
+        const targets = [
+          ...m.elevators.map(e => ({ x: e.x + 24, y: e.y + 10 })),
+          ...m.turbines.map(t => ({ x: t.x + 18, y: t.y + 18 })),
+          ...m.pistons.map(p => ({ x: p.x + 11, y: p.floorY - 20 })),
+          ...m.gondolas.map(g => ({ x: g.x + 22, y: g.y + 10 })),
+          ...m.zipGondolas.map(z => ({ x: z.x + 22, y: z.y + 10 })),
+          ...m.gantries.map(gn => ({ x: gn.x + 22, y: gn.y + 10 }))
+        ];
+
+        for (const t of targets) {
+          const d = Math.hypot(t.x - px, t.y - py);
+          if (d < closestDist) {
+            closestDist = d;
+            closestRelX = t.x - px;
+          }
+        }
+      }
+
+      // 160px audible range with smooth falloff & stereo panning
+      const maxAudibleDist = 160;
+      if (closestDist < maxAudibleDist) {
+        const targetVol = (1 - closestDist / maxAudibleDist) * 0.16;
+        this.humGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.08);
+
+        if (this.humPan) {
+          const pan = clamp(closestRelX / 100, -1, 1);
+          this.humPan.pan.setTargetAtTime(pan, this.ctx.currentTime, 0.08);
+        }
+      } else {
+        this.humGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
       }
     }
 
@@ -159,41 +281,11 @@
       if (this.master && this.ctx) {
         this.master.gain.setTargetAtTime(this.muted ? 0 : 0.34, this.ctx.currentTime, 0.05);
       }
+      if (this.musicTrack) this.musicTrack.volume = this.muted ? 0 : 0.40;
+      if (this.envTrack) this.envTrack.volume = this.muted ? 0 : 0.45;
     }
 
-    startAmbientDrone() {
-      if (!this.ctx || !this.noiseBuffer) return;
-      const src = this.ctx.createBufferSource();
-      src.buffer = this.noiseBuffer;
-      src.loop = true;
-
-      this.droneFilter = this.ctx.createBiquadFilter();
-      this.droneFilter.type = 'lowpass';
-      this.droneFilter.frequency.value = 135;
-
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.09;
-
-      src.connect(this.droneFilter);
-      this.droneFilter.connect(gain);
-      gain.connect(this.master);
-      src.start();
-    }
-
-    setBiome(biome) {
-      this.currentBiome = biome;
-      if (!this.droneFilter || !this.ctx) return;
-      const freqMap = {
-        sector04: 135,
-        cryo: 85,
-        sector07: 195,
-        amber: 155,
-        sector09: 105,
-        viaduct: 340,
-        atrium: 240
-      };
-      this.droneFilter.frequency.setTargetAtTime(freqMap[biome] || 135, this.ctx.currentTime, 0.35);
-    }
+    setBiome() {}
 
     playStep(isMetal) {
       if (!this.started || this.muted) return;
@@ -1510,6 +1602,7 @@
       this.camera.worldH = this.level.worldH;
       this.particles.reset(this.level.worldW, this.level.worldH, this.level.palette);
       this.audio.setBiome(this.level.biome);
+      this.audio.playSectorAudio(sectorIdx);
 
       this.player.resetPosition(this.level.spawn.x, this.level.spawn.y);
       this.camera.snapTo(this.player.x, this.player.y);
@@ -1694,6 +1787,7 @@
       this.verlet.update(dt, this.time, this.player, this.machinery.windForce);
       this.particles.update(dt, this.time, this.level, this.audio);
       this.camera.update(dt, this.player, this.finaleActive);
+      this.audio.updateSpatialHum(this.player, this.level);
 
       const camCx = this.camera.x + PIXEL_W * 0.5;
       const camCy = this.camera.y + PIXEL_H * 0.5;
