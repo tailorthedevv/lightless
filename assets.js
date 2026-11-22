@@ -95,7 +95,7 @@
   GAME.valueNoise1D = valueNoise1D;
 
   // =========================================================================
-  // 2. CRISP BITMAP PIXEL FONT (FULL ASCII + ARROWS FOR SIGNS & TERMINALS)
+  // 2. CRISP BITMAP PIXEL FONT (FULL ASCII + ARROWS)
   // =========================================================================
   const FONT_GLYPHS = {
     'A': ['0110','1001','1111','1001','1001'],
@@ -227,10 +227,11 @@
   GAME.drawPixelText = drawPixelText;
 
   // =========================================================================
-  // 3. THREE-SECTOR BIOME PALETTES
+  // 3. SEVEN-CHAPTER BIOME PALETTES
   // =========================================================================
   const BIOME_PALETTES = {
     sector04: {
+      code: 'SEC-04',
       name: 'SECTOR 04: FLOODED SUBWAY',
       skyStops: [
         { y: 0.00, hex: '#060a14' },
@@ -247,29 +248,16 @@
       vineCols: ['#0b2121', '#10302c', '#153d35'],
       ledCols: ['#ff3b4d', '#6ee89a', '#8ec5ff'],
       stone: {
-        core: '#030408',
-        dark: '#0a101c',
-        mid: '#1a273b',
-        edge: '#354861',
-        rimMid: '#4a5d73',
-        rimHigh: '#7b94ad',
-        crack: '#070b14'
+        core: '#030408', dark: '#0a101c', mid: '#1a273b',
+        edge: '#354861', rimMid: '#4a5d73', rimHigh: '#7b94ad', crack: '#070b14'
       },
       flora: {
-        dark: '#124032',
-        mid: '#1c5c46',
-        bright: '#38a86b',
-        tip: '#6ee89a',
+        dark: '#124032', mid: '#1c5c46', bright: '#38a86b', tip: '#6ee89a',
         blooms: ['#ff7a59', '#ff8fa3', '#7af5ff', '#ffe38f']
       },
       truss: {
-        top: '#6f8aa8',
-        mid: '#3c5069',
-        dark: '#182230',
-        rivet: '#99b4d1',
-        braceA: '#364961',
-        braceB: '#4f6885',
-        rust: '#6e3429'
+        top: '#6f8aa8', mid: '#3c5069', dark: '#182230',
+        rivet: '#99b4d1', braceA: '#364961', braceB: '#4f6885', rust: '#6e3429'
       },
       ambientShadow: 'rgba(4, 9, 22, 0.74)',
       shaftColor: [55, 110, 195],
@@ -279,10 +267,51 @@
       waterHighlight: '#4a9ec7',
       waterMid: '#214d75',
       moteColors: ['#8ec5ff', '#b8dcff', '#6ee89a', '#ffd99e', '#e5a8ff'],
-      fogTint: 'rgba(16, 36, 72, 0.10)'
+      fogTint: 'rgba(16, 36, 72, 0.10)',
+      noGrass: false
+    },
+
+    cryo: {
+      code: 'CRYO-00',
+      name: 'BLIND CRYO-ARCHIVE',
+      skyStops: [
+        { y: 0.00, hex: '#020206' },
+        { y: 0.50, hex: '#030309' },
+        { y: 1.00, hex: '#050612' }
+      ],
+      archCols: ['#04040a', '#060714', '#08091c', '#0b0e26', '#101438'],
+      brickMortar: '#020205',
+      brickShades: ['#030308', '#04050d', '#050612', '#060817', '#080a1c'],
+      pipeColor: '#090c1f',
+      pipeHi: '#1c244d',
+      vineCols: ['#04050c', '#080a18', '#151c3b'],
+      ledCols: ['#ff2442', '#ff2442', '#705cff'],
+      stone: {
+        core: '#020206', dark: '#050612', mid: '#101430',
+        edge: '#2d3570', rimMid: '#705cff', rimHigh: '#cfe8ff', crack: '#020207'
+      },
+      flora: {
+        dark: '#14193d', mid: '#3a3480', bright: '#705cff', tip: '#cfe8ff',
+        blooms: ['#cfe8ff', '#705cff', '#91a8ff', '#ffffff']
+      },
+      truss: {
+        top: '#cfe8ff', mid: '#303466', dark: '#0a0b1a',
+        rivet: '#ffffff', braceA: '#22264d', braceB: '#705cff', rust: '#1b1d36'
+      },
+      ambientShadow: 'rgba(2, 2, 6, 0.94)',
+      shaftColor: [112, 92, 255],
+      lampGlow: [185, 220, 255],
+      orbColor: '#705cff',
+      waterColor: 'rgba(8, 12, 32, 0.85)',
+      waterHighlight: '#cfe8ff',
+      waterMid: '#433899',
+      moteColors: ['#cfe8ff', '#705cff', '#9db8ff', '#ffffff'],
+      fogTint: 'rgba(4, 4, 14, 0.14)',
+      noGrass: true
     },
 
     sector07: {
+      code: 'SEC-07',
       name: 'SECTOR 07: HYDRO-PUMP CONDUITS',
       skyStops: [
         { y: 0.00, hex: '#041317' },
@@ -299,29 +328,16 @@
       vineCols: ['#0a2e30', '#114747', '#1f7a73'],
       ledCols: ['#4dffdb', '#b8ff9e', '#ffaa33'],
       stone: {
-        core: '#030408',
-        dark: '#08171c',
-        mid: '#142f36',
-        edge: '#29575c',
-        rimMid: '#3b7375',
-        rimHigh: '#6ab0a8',
-        crack: '#040c0f'
+        core: '#030408', dark: '#08171c', mid: '#142f36',
+        edge: '#29575c', rimMid: '#3b7375', rimHigh: '#6ab0a8', crack: '#040c0f'
       },
       flora: {
-        dark: '#0d3b38',
-        mid: '#156159',
-        bright: '#23b59b',
-        tip: '#80ffea',
+        dark: '#0d3b38', mid: '#156159', bright: '#23b59b', tip: '#80ffea',
         blooms: ['#4dffdb', '#99fff0', '#54d2ff', '#b8ff9e']
       },
       truss: {
-        top: '#6fa39c',
-        mid: '#39615e',
-        dark: '#142626',
-        rivet: '#9ed9ce',
-        braceA: '#2f5452',
-        braceB: '#4a7a75',
-        rust: '#7a4829'
+        top: '#6fa39c', mid: '#39615e', dark: '#142626',
+        rivet: '#9ed9ce', braceA: '#2f5452', braceB: '#4a7a75', rust: '#7a4829'
       },
       ambientShadow: 'rgba(3, 14, 18, 0.74)',
       shaftColor: [45, 195, 190],
@@ -331,10 +347,53 @@
       waterHighlight: '#6bffea',
       waterMid: '#1f7a7a',
       moteColors: ['#66ffe5', '#99fff0', '#48cae4', '#b8ff9e', '#ffffff'],
-      fogTint: 'rgba(14, 62, 68, 0.11)'
+      fogTint: 'rgba(14, 62, 68, 0.11)',
+      noGrass: false
+    },
+
+    amber: {
+      code: 'REEF-08',
+      name: 'FOSSILIZED AMBER REEF',
+      skyStops: [
+        { y: 0.00, hex: '#140611' },
+        { y: 0.34, hex: '#210c1c' },
+        { y: 0.68, hex: '#38162b' },
+        { y: 0.90, hex: '#542336' },
+        { y: 1.00, hex: '#3b151e' }
+      ],
+      archCols: ['#1f0b1a', '#2b1024', '#3b1830', '#4f2238', '#6e343d'],
+      brickMortar: '#12050f',
+      brickShades: ['#1e0b19', '#260e1f', '#301327', '#3d192e', '#4d2236'],
+      pipeColor: '#59332a',
+      pipeHi: '#946243',
+      vineCols: ['#301222', '#52212c', '#9c4b39'],
+      ledCols: ['#ffd27d', '#ff7369', '#f2e5d5'],
+      stone: {
+        core: '#12060f', dark: '#210d1b', mid: '#3b192b',
+        edge: '#733843', rimMid: '#c46c5e', rimHigh: '#f2e5d5', crack: '#170812'
+      },
+      flora: {
+        dark: '#4a1b26', mid: '#8c373c', bright: '#ff7369', tip: '#ffd27d',
+        blooms: ['#ffd27d', '#ff7369', '#f2e5d5', '#ffb380']
+      },
+      truss: {
+        top: '#f2e5d5', mid: '#785038', dark: '#241418',
+        rivet: '#ffd27d', braceA: '#543528', braceB: '#a36c45', rust: '#8c332b'
+      },
+      ambientShadow: 'rgba(22, 7, 18, 0.68)',
+      shaftColor: [255, 200, 115],
+      lampGlow: [255, 165, 95],
+      orbColor: '#ffd27d',
+      waterColor: 'rgba(180, 95, 22, 0.86)',
+      waterHighlight: '#ffe699',
+      waterMid: '#d96b1f',
+      moteColors: ['#ffd27d', '#ff9b6a', '#f2e5d5', '#ff7369'],
+      fogTint: 'rgba(72, 26, 38, 0.12)',
+      noGrass: false
     },
 
     sector09: {
+      code: 'SEC-09',
       name: 'SECTOR 09: GEOTHERMAL REACTOR',
       skyStops: [
         { y: 0.00, hex: '#08070e' },
@@ -351,29 +410,16 @@
       vineCols: ['#170b0d', '#261315', '#3b211e'],
       ledCols: ['#ffaa33', '#ff3b4d', '#ffd875'],
       stone: {
-        core: '#030408',
-        dark: '#14090b',
-        mid: '#261416',
-        edge: '#472a28',
-        rimMid: '#634139',
-        rimHigh: '#916d5f',
-        crack: '#090305'
+        core: '#030408', dark: '#14090b', mid: '#261416',
+        edge: '#472a28', rimMid: '#634139', rimHigh: '#916d5f', crack: '#090305'
       },
       flora: {
-        dark: '#2e1612',
-        mid: '#52291c',
-        bright: '#8c4926',
-        tip: '#ffaa33',
+        dark: '#2e1612', mid: '#52291c', bright: '#8c4926', tip: '#ffaa33',
         blooms: ['#ffaa33', '#ff5938', '#ffd875', '#ff7a45']
       },
       truss: {
-        top: '#8c756b',
-        mid: '#4f3b35',
-        dark: '#1f1412',
-        rivet: '#c2a799',
-        braceA: '#42302b',
-        braceB: '#664a40',
-        rust: '#9c3a1f'
+        top: '#8c756b', mid: '#4f3b35', dark: '#1f1412',
+        rivet: '#c2a799', braceA: '#42302b', braceB: '#664a40', rust: '#9c3a1f'
       },
       ambientShadow: 'rgba(12, 4, 6, 0.72)',
       shaftColor: [255, 145, 70],
@@ -383,7 +429,92 @@
       waterHighlight: '#ffbb45',
       waterMid: '#cf421b',
       moteColors: ['#ffaa33', '#ff6b3d', '#ffd875', '#ff9466', '#ffffff'],
-      fogTint: 'rgba(72, 24, 16, 0.12)'
+      fogTint: 'rgba(72, 24, 16, 0.12)',
+      noGrass: false
+    },
+
+    viaduct: {
+      code: 'SPAN-11',
+      name: 'THE GALE VIADUCT',
+      skyStops: [
+        { y: 0.00, hex: '#1e2338' },
+        { y: 0.35, hex: '#333b5c' },
+        { y: 0.65, hex: '#49547a' },
+        { y: 0.86, hex: '#8fa1c7' },
+        { y: 1.00, hex: '#d4beb8' }
+      ],
+      archCols: ['#272e47', '#353e5e', '#465178', '#5c6994', '#7a8ab8'],
+      brickMortar: '#1b2033',
+      brickShades: ['#252c45', '#2d3552', '#374163', '#424e73', '#51608a'],
+      pipeColor: '#3a4669',
+      pipeHi: '#7484ab',
+      vineCols: ['#1f253b', '#2c3552', '#495680'],
+      ledCols: ['#ffd27d', '#ff7a59', '#cfe8ff'],
+      stone: {
+        core: '#090b14', dark: '#171c2e', mid: '#29324d',
+        edge: '#49567a', rimMid: '#7686ab', rimHigh: '#b4c2de', crack: '#101421'
+      },
+      flora: {
+        dark: '#25383d', mid: '#3a5754', bright: '#688f78', tip: '#a6c49f',
+        blooms: ['#f2c2b3', '#ffe5b8', '#b8d0eb']
+      },
+      truss: {
+        top: '#b8c7e0', mid: '#4d5b80', dark: '#1a2033',
+        rivet: '#edf2fa', braceA: '#36415e', braceB: '#6d7ea8', rust: '#754940'
+      },
+      ambientShadow: 'rgba(18, 22, 38, 0.42)',
+      shaftColor: [215, 205, 225],
+      lampGlow: [255, 195, 125],
+      orbColor: '#ffe0a3',
+      waterColor: 'rgba(42, 50, 78, 0.72)',
+      waterHighlight: '#d9c6c0',
+      waterMid: '#68769e',
+      moteColors: ['#dce6f7', '#f0d8cf', '#9eb0d4', '#ffffff'],
+      fogTint: 'rgba(92, 102, 145, 0.11)',
+      isOpenAir: true,
+      noGrass: false
+    },
+
+    atrium: {
+      code: 'DOME-12',
+      name: 'SHATTERED GLASS ATRIUM',
+      skyStops: [
+        { y: 0.00, hex: '#7ba6bf' },
+        { y: 0.30, hex: '#a6cad9' },
+        { y: 0.65, hex: '#dbe8df' },
+        { y: 0.90, hex: '#f2e0b6' },
+        { y: 1.00, hex: '#c7c29f' }
+      ],
+      archCols: ['#687c8f', '#8094a6', '#97aab8', '#b5c4cc', '#dce6f0'],
+      brickMortar: '#5c6b78',
+      brickShades: ['#748696', '#8395a6', '#94a5b5', '#a6b6c4', '#bccad4'],
+      pipeColor: '#8c743e',
+      pipeHi: '#c9ad67',
+      vineCols: ['#2c5924', '#4b8f35', '#6cc447'],
+      ledCols: ['#d9f77a', '#fff0a6', '#80e5ff'],
+      stone: {
+        core: '#1d242b', dark: '#38444f', mid: '#5f6f7d',
+        edge: '#8fa1b3', rimMid: '#bac7d4', rimHigh: '#f0f5fa', crack: '#2c3640'
+      },
+      flora: {
+        dark: '#25521d', mid: '#458a30', bright: '#6cc447', tip: '#d9f77a',
+        blooms: ['#fff099', '#ffb3d9', '#a6f2ff', '#ffffff']
+      },
+      truss: {
+        top: '#e3c778', mid: '#8c733a', dark: '#362c18',
+        rivet: '#fff2bd', braceA: '#6b572c', braceB: '#baa054', rust: '#754e29'
+      },
+      ambientShadow: 'rgba(22, 30, 42, 0.30)',
+      shaftColor: [255, 240, 175],
+      lampGlow: [255, 225, 130],
+      orbColor: '#d9f77a',
+      waterColor: 'rgba(65, 135, 145, 0.68)',
+      waterHighlight: '#fff6c7',
+      waterMid: '#80c9bd',
+      moteColors: ['#fff5bd', '#d9f77a', '#ffffff', '#b8f2ff'],
+      fogTint: 'rgba(245, 225, 165, 0.08)',
+      sunlit: true,
+      noGrass: false
     }
   };
   GAME.BIOME_PALETTES = BIOME_PALETTES;
@@ -401,24 +532,36 @@
       this.cornerDots = {};
       this.robotFrames = {};
       this.signs = {};
+
       this.cageLamp = null;
       this.bioLamp = null;
       this.amberLamp = null;
+      this.cryoLamp = null;
+      this.brassLamp = null;
+      this.coralLamp = null;
+
       this.anchorPlate = null;
       this.wallBracketLeft = null;
       this.wallBracketRight = null;
+
       this.energyOrb = null;
       this.bioOrb = null;
       this.reactorOrb = null;
+      this.cryoOrb = null;
+      this.amberOrb = null;
+      this.skyOrb = null;
+
       this.crystals = [];
       this.bioMushrooms = [];
+      this.amberCrystals = [];
+      this.atriumPlanters = [];
       this.shardFrames = [];
       this.crates = [];
       this.pipeFixtures = [];
       this.terminalSprite = null;
       this.exitGateSprite = null;
 
-      // Animated & Upgraded Forgotten Facility Props
+      // Animated & New Level Props
       this.bioVatFrames = [];
       this.magmaVatFrames = [];
       this.pistonBase = null;
@@ -426,6 +569,20 @@
       this.switchFrames = [];
       this.blastDoor = null;
       this.droneFrames = [];
+
+      // 4 New Biome Bespoke Sprites
+      this.sonarPylonFrames = [];
+      this.spotlightHousing = null;
+      this.icicleSprites = [];
+      this.windTurbineTower = null;
+      this.windSailFrames = [];
+      this.cableCarSprite = null;
+      this.sporePodFrames = [];
+      this.centrifugeRing = null;
+      this.gantryLiftSprite = null;
+      this.sprinklerSprite = null;
+      this.fernFrames = [];
+      this.mothFrames = [];
 
       // Moving Machinery Sprites
       this.elevatorCage = null;
@@ -456,11 +613,13 @@
       this.bakeOrbs();
       this.bakeCrystals();
       this.bakeBioMushrooms();
+      this.bakeAmberAndAtriumProps();
       this.bakeShardPickups();
       this.bakeCrates();
       this.bakePipeFixtures();
       this.bakeTerminalAndExitGate();
       this.bakeUpgradedPropsAndDrones();
+      this.bakeNewBiomeSprites();
       this.bakeMachinerySprites();
       this.bakeBlurredForegroundDOF();
     }
@@ -522,21 +681,13 @@
     bakeSurfaceDawnBackdrop() {
       const { canvas, ctx } = createOffscreen(GAME.PIXEL_W, GAME.PIXEL_H);
       const base = this.buildDitheredBackdrop([
-        { y: 0.00, hex: '#09152b' },
-        { y: 0.35, hex: '#18345e' },
-        { y: 0.72, hex: '#345e8c' },
-        { y: 0.90, hex: '#6387ab' },
-        { y: 1.00, hex: '#a69e8d' }
+        { y: 0.00, hex: '#4982a8' },
+        { y: 0.35, hex: '#7fb5cf' },
+        { y: 0.72, hex: '#cfe3db' },
+        { y: 0.90, hex: '#fae1ad' },
+        { y: 1.00, hex: '#f2c299' }
       ]);
       ctx.drawImage(base, 0, 0);
-
-      const rng = new SeededRNG(2099);
-      for (let i = 0; i < 65; i++) {
-        const sx = rng.int(4, GAME.PIXEL_W - 4);
-        const sy = rng.int(4, 130);
-        ctx.fillStyle = rng.chance(0.3) ? '#fff5d6' : '#cbe5ff';
-        ctx.fillRect(sx, sy, 1, 1);
-      }
       this.surfaceBackdrop = canvas;
     }
 
@@ -545,6 +696,62 @@
       const { canvas, ctx } = createOffscreen(w, h);
       const [c0, c1, c2, c3, c4] = pal.archCols;
 
+      if (biome === 'viaduct') {
+        // Distant storm cloud ridges & colossal bridge tower silhouettes
+        ctx.fillStyle = c1;
+        for (let x = 40; x < w; x += 220) {
+          ctx.fillRect(x, 30, 34, h - 30);
+          ctx.fillRect(x + 6, 12, 22, 24);
+          ctx.fillStyle = c3;
+          ctx.fillRect(x + 4, 30, 6, h - 30);
+          ctx.fillStyle = c1;
+          // Giant distant suspension cables
+          for (let dx = 0; dx <= 220; dx++) {
+            const t = dx / 220;
+            const sag = Math.sin(t * Math.PI) * 58;
+            ctx.fillRect(x + 17 + dx, Math.round(36 + sag), 1, 2);
+          }
+        }
+        // Misty gorge clouds along lower backdrop
+        ctx.fillStyle = c4;
+        for (let cx = 0; cx < w; cx += 48) {
+          const cy = 260 + Math.round(Math.sin(cx * 0.05) * 14);
+          ctx.fillRect(cx, cy, 56, h - cy);
+        }
+        return canvas;
+      }
+
+      if (biome === 'atrium') {
+        // Towering arched greenhouse glass mullions & golden-hour ribs
+        ctx.fillStyle = c0;
+        for (let ax = 0; ax < w; ax += 128) {
+          ctx.fillRect(ax, 0, 10, h);
+          ctx.fillStyle = c2;
+          ctx.fillRect(ax + 64, 0, 6, h);
+          ctx.fillStyle = c0;
+          for (let dx = 0; dx <= 128; dx++) {
+            const norm = (dx - 64) / 64;
+            const archY = Math.floor(38 - (1 - norm * norm) * 30);
+            ctx.fillRect(ax + dx, archY, 1, 4);
+            ctx.fillRect(ax + dx, archY + 140, 1, 3);
+          }
+        }
+        return canvas;
+      }
+
+      if (biome === 'cryo') {
+        // Ultra-dark monolithic server pillars with hairline indigo edge
+        ctx.fillStyle = c1;
+        for (let sx = 18; sx < w; sx += 96) {
+          ctx.fillRect(sx, 0, 42, h);
+          ctx.fillStyle = c4;
+          ctx.fillRect(sx, 0, 1, h);
+          ctx.fillStyle = c1;
+        }
+        return canvas;
+      }
+
+      // Standard arches for sector04 / sector07 / sector09 / amber
       ctx.fillStyle = c0;
       for (let ax = 20; ax < w; ax += 180) {
         ctx.fillRect(ax, 0, 26, h);
@@ -556,7 +763,18 @@
         }
       }
 
-      if (biome === 'sector07') {
+      if (biome === 'amber') {
+        // Curved diagonal fossil bone ribcages & giant buried gear silhouette
+        ctx.fillStyle = c3;
+        for (let rx = 30; rx < w; rx += 160) {
+          for (let i = 0; i < 120; i++) {
+            const t = i / 120;
+            const bx = rx + Math.round(t * 75);
+            const by = 45 + Math.round(Math.sin(t * Math.PI) * 90 + t * 80);
+            ctx.fillRect(bx, by, 8, 5);
+          }
+        }
+      } else if (biome === 'sector07') {
         for (const tx of [70, 270, 470]) {
           ctx.fillStyle = c1;
           ctx.fillRect(tx, 34, 68, 280);
@@ -588,35 +806,6 @@
         ctx.fillRect(0, 88, w, 4);
         ctx.fillStyle = c0;
         ctx.fillRect(0, 107, w, 5);
-
-        for (const px of [95, 290, 485]) {
-          ctx.fillStyle = c1;
-          ctx.fillRect(px, 0, 32, h);
-          ctx.fillStyle = c3;
-          ctx.fillRect(px + 2, 0, 5, h);
-          ctx.fillStyle = c0;
-          ctx.fillRect(px + 25, 0, 7, h);
-          for (let ry = 40; ry < h; ry += 72) {
-            ctx.fillStyle = c2;
-            ctx.fillRect(px - 4, ry, 40, 8);
-            ctx.fillStyle = c4;
-            ctx.fillRect(px - 4, ry, 40, 2);
-          }
-        }
-      }
-
-      ctx.fillStyle = c2;
-      for (let x = 155; x < w; x += 260) {
-        for (let y = 145; y < 290; y++) {
-          const rad = 46;
-          if (y < 145 + rad) {
-            const dy = 145 + rad - y;
-            const span = Math.floor(Math.sqrt(rad * rad - dy * dy));
-            ctx.fillRect(x - span, y, span * 2, 1);
-          } else {
-            ctx.fillRect(x - rad, y, rad * 2, 1);
-          }
-        }
       }
       return canvas;
     }
@@ -624,14 +813,45 @@
     buildBrickVault(biome, pal) {
       const w = 512, h = 384;
       const { canvas, ctx } = createOffscreen(w, h);
+      const rng = new SeededRNG(177 + biome.charCodeAt(biome.length - 1));
+      const leds = [];
+
+      if (biome === 'viaduct') {
+        // Open stormy sky — only sparse distant stone bridge piers & lower storm mist
+        for (const px of [50, 240, 420]) {
+          ctx.fillStyle = pal.brickShades[1];
+          ctx.fillRect(px, 120, 26, h - 120);
+          ctx.fillStyle = pal.pipeHi;
+          ctx.fillRect(px + 2, 120, 4, h - 120);
+          ctx.fillStyle = pal.brickMortar;
+          ctx.fillRect(px - 3, 180, 32, 8);
+        }
+        canvas.leds = leds;
+        return canvas;
+      }
+
+      if (biome === 'atrium') {
+        // Airy glasshouse translucent wrought-iron lattice & pale sunlit panes
+        for (let x = 0; x < w; x += 64) {
+          ctx.fillStyle = 'rgba(115, 135, 152, 0.35)';
+          ctx.fillRect(x, 0, 4, h);
+          ctx.fillStyle = 'rgba(240, 248, 255, 0.16)';
+          ctx.fillRect(x + 4, 0, 2, h);
+        }
+        for (let y = 0; y < h; y += 64) {
+          ctx.fillStyle = 'rgba(115, 135, 152, 0.32)';
+          ctx.fillRect(0, y, w, 3);
+        }
+        canvas.leds = leds;
+        return canvas;
+      }
+
       const img = ctx.createImageData(w, h);
       const data = img.data;
-
       const mortarRgb = hexToRgb(pal.brickMortar);
       const brickPalette = pal.brickShades.map(hexToRgb);
-
-      const bh = biome === 'sector09' ? 12 : 8;
-      const bw = biome === 'sector09' ? 24 : 16;
+      const bh = biome === 'sector09' ? 12 : (biome === 'amber' ? 10 : 8);
+      const bw = biome === 'sector09' ? 24 : (biome === 'cryo' ? 32 : 16);
 
       for (let y = 0; y < h; y++) {
         const row = Math.floor(y / bh);
@@ -653,33 +873,62 @@
             const base = brickPalette[pIdx];
             const grain = (hash2D(x, y, 77) - 0.5) * 8;
             const bevel = rowY === 1 ? 6 : (rowY === bh - 1 ? -5 : 0);
-            r = clamp(Math.round((base[0] + grain + bevel) * fogFactor), 4, 255);
-            g = clamp(Math.round((base[1] + grain + bevel) * fogFactor), 4, 255);
-            b = clamp(Math.round((base[2] + grain + bevel) * fogFactor), 6, 255);
+            r = clamp(Math.round((base[0] + grain + bevel) * fogFactor), 2, 255);
+            g = clamp(Math.round((base[1] + grain + bevel) * fogFactor), 2, 255);
+            b = clamp(Math.round((base[2] + grain + bevel) * fogFactor), 4, 255);
           }
 
-          const cellX = x % 128;
-          const distCenter = Math.abs(cellX - 64);
-          let alpha = 228;
-          if (y > 90 && y < 275 && distCenter < 34) {
-            const archTop = y < 124 ? Math.sqrt(34 * 34 - distCenter * distCenter) : 34;
-            if (y > 124 - archTop) {
-              alpha = 65;
+          let alpha = biome === 'cryo' ? 245 : 228;
+          if (biome !== 'cryo') {
+            const cellX = x % 128;
+            const distCenter = Math.abs(cellX - 64);
+            if (y > 90 && y < 275 && distCenter < 34) {
+              const archTop = y < 124 ? Math.sqrt(34 * 34 - distCenter * distCenter) : 34;
+              if (y > 124 - archTop) alpha = 65;
             }
           }
 
           const idx = (y * w + x) * 4;
-          data[idx] = r;
-          data[idx + 1] = g;
-          data[idx + 2] = b;
-          data[idx + 3] = alpha;
+          data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = alpha;
         }
       }
       ctx.putImageData(img, 0, 0);
 
-      // Vertical pipe conduits & junction server boxes with tiny distant warning LEDs
-      const rng = new SeededRNG(177 + biome.charCodeAt(biome.length - 1));
-      const leds = [];
+      if (biome === 'cryo') {
+        // Towering black monolith server bays studded with microscopic crimson LEDs
+        for (let px = 28; px < w; px += 96) {
+          ctx.fillStyle = '#020206';
+          ctx.fillRect(px, 0, 34, h);
+          ctx.fillStyle = '#1b1d45';
+          ctx.fillRect(px, 0, 1, h);
+          ctx.fillRect(px + 33, 0, 1, h);
+          for (let ly = 18; ly < h - 18; ly += 22) {
+            if (rng.chance(0.65)) {
+              const lx = px + rng.int(5, 28);
+              const col = rng.chance(0.8) ? '#ff2442' : '#705cff';
+              ctx.fillStyle = col;
+              ctx.fillRect(lx, ly, 1, 1);
+              leds.push({ x: lx, y: ly, color: col, phase: rng.range(0, 6.28) });
+            }
+          }
+        }
+        canvas.leds = leds;
+        return canvas;
+      }
+
+      if (biome === 'amber') {
+        // Frozen gear halos trapped inside translucent golden-amber cavern walls
+        for (const [gx, gy] of [[110, 140], [340, 210]]) {
+          ctx.fillStyle = 'rgba(255, 195, 95, 0.16)';
+          ctx.fillRect(gx - 28, gy - 28, 56, 56);
+          ctx.strokeStyle = 'rgba(255, 210, 125, 0.35)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(gx, gy, 20, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
       for (const px of [20, 146, 276, 404]) {
         ctx.fillStyle = pal.brickMortar;
         ctx.fillRect(px - 1, 0, 12, h);
@@ -694,49 +943,25 @@
           ctx.fillRect(px - 1, fy, 12, 3);
         }
 
-        // Distant wall junction relay boxes beside pipes with tiny indicator LEDs
         for (let jy = 42; jy < h - 30; jy += 96) {
           const jx = px + 14;
           ctx.fillStyle = pal.brickMortar;
           ctx.fillRect(jx, jy, 10, 14);
           ctx.fillStyle = pal.pipeColor;
           ctx.fillRect(jx + 1, jy + 1, 8, 12);
-          ctx.fillStyle = pal.pipeHi;
-          ctx.fillRect(jx + 1, jy + 1, 8, 1);
           const ledCol = pal.ledCols[rng.int(0, pal.ledCols.length - 1)];
-          const ledX = jx + 3;
-          const ledY = jy + 5;
           ctx.fillStyle = ledCol;
-          ctx.fillRect(ledX, ledY, 1, 1);
-          if (rng.chance(0.5)) {
-            ctx.fillRect(ledX + 3, ledY, 1, 1);
-          }
-          leds.push({ x: ledX, y: ledY, color: ledCol, phase: rng.range(0, 6.28) });
+          ctx.fillRect(jx + 3, jy + 5, 1, 1);
+          leds.push({ x: jx + 3, y: jy + 5, color: ledCol, phase: rng.range(0, 6.28) });
         }
       }
 
-      // Horizontal steel girders with distant server rack LED clusters
       for (const gy of [78, 286]) {
         ctx.fillStyle = pal.brickMortar;
         ctx.fillRect(0, gy, w, 12);
         ctx.fillStyle = pal.pipeColor;
         ctx.fillRect(0, gy + 1, w, 2);
         ctx.fillRect(0, gy + 9, w, 2);
-        for (let rx = 8; rx < w; rx += 16) {
-          ctx.fillStyle = pal.pipeHi;
-          ctx.fillRect(rx, gy + 4, 2, 3);
-        }
-        // Embedded server control strip LEDs along upper girder
-        for (let sx = 54; sx < w; sx += 128) {
-          ctx.fillStyle = pal.brickMortar;
-          ctx.fillRect(sx, gy + 3, 18, 5);
-          for (let lx = 2; lx < 16; lx += 4) {
-            const col = pal.ledCols[(sx + lx) % pal.ledCols.length];
-            ctx.fillStyle = col;
-            ctx.fillRect(sx + lx, gy + 5, 1, 1);
-            leds.push({ x: sx + lx, y: gy + 5, color: col, phase: rng.range(0, 6.28) });
-          }
-        }
       }
 
       canvas.leds = leds;
@@ -746,10 +971,22 @@
     buildBgFoliage(biome, pal) {
       const w = 480, h = 270;
       const { canvas, ctx } = createOffscreen(w, h);
-      const rng = new SeededRNG(404 + biome.charCodeAt(biome.length - 1));
+      const rng = new SeededRNG(404 + biome.charCodeAt(0));
       const [vDark, vMid, vLeaf] = pal.vineCols;
 
-      if (biome !== 'sector09') {
+      if (biome === 'viaduct') {
+        // Distant catenary suspension wires in storm mist
+        ctx.fillStyle = '#252c45';
+        for (const [x0, y0, x1, y1] of [[0, 20, 240, 25], [240, 25, 480, 18]]) {
+          for (let i = 0; i <= x1 - x0; i++) {
+            const t = i / (x1 - x0);
+            ctx.fillRect(x0 + i, Math.round(lerp(y0, y1, t) + Math.sin(t * Math.PI) * 32), 1, 1);
+          }
+        }
+        return canvas;
+      }
+
+      if (biome !== 'sector09' && biome !== 'cryo') {
         for (let x = 6; x < w; x += rng.int(11, 22)) {
           const len = rng.int(26, 94);
           const thickness = rng.chance(0.35) ? 2 : 1;
@@ -761,32 +998,17 @@
               const side = rng.chance(0.5) ? -1 : 1;
               ctx.fillStyle = vLeaf;
               ctx.fillRect(x + sway + side, y, 2, 2);
-              if (biome === 'sector07' && y > len - 6 && rng.chance(0.45)) {
-                ctx.fillStyle = '#33b5a6';
-                ctx.fillRect(x + sway, y + 1, 2, 2);
-              }
             }
           }
         }
-      } else {
-        for (let x = 18; x < w; x += rng.int(26, 48)) {
-          const len = rng.int(34, 110);
-          ctx.fillStyle = vDark;
-          ctx.fillRect(x, 0, 2, len);
-          ctx.fillStyle = vLeaf;
-          ctx.fillRect(x - 1, len - 4, 4, 4);
-        }
       }
 
-      for (const bx of [84, 240, 396]) {
-        ctx.fillStyle = pal.brickMortar;
-        ctx.fillRect(bx, 0, 10, h);
-        ctx.fillStyle = pal.archCols[1];
-        ctx.fillRect(bx + 1, 0, 2, h);
-        for (let my = 18; my < h; my += rng.int(28, 52)) {
-          ctx.fillStyle = vMid;
-          ctx.fillRect(bx - 2, my, 14, 4);
-          ctx.fillRect(bx + rng.int(-2, 8), my + 4, 2, rng.int(4, 12));
+      if (biome !== 'cryo' && biome !== 'atrium') {
+        for (const bx of [84, 240, 396]) {
+          ctx.fillStyle = pal.brickMortar;
+          ctx.fillRect(bx, 0, 10, h);
+          ctx.fillStyle = pal.archCols[1];
+          ctx.fillRect(bx + 1, 0, 2, h);
         }
       }
 
@@ -797,15 +1019,14 @@
           const t = i / steps;
           const cx = Math.round(lerp(x0, x1, t));
           const sag = Math.sin(t * Math.PI) * 26;
-          const cy = Math.round(lerp(y0, y1, t) + sag);
-          ctx.fillRect(cx, cy, 1, 1);
+          ctx.fillRect(cx, Math.round(lerp(y0, y1, t) + sag), 1, 1);
         }
       }
       return canvas;
     }
 
     // -----------------------------------------------------------------------
-    // B. PER-BIOME AUTO-TILED 16x16 TERRAIN (20x28 STAMPS + CORNER BEVELS)
+    // B. PER-BIOME AUTO-TILED 16x16 TERRAIN & TRUSSES (ALL 7 BIOMES)
     // -----------------------------------------------------------------------
     bakeBiomeTerrainTiles(biome, pal) {
       const CORE = hexToRgb(pal.stone.core);
@@ -837,7 +1058,7 @@
           const { canvas, ctx } = createOffscreen(SW, SH);
           const img = ctx.createImageData(SW, SH);
           const d = img.data;
-          const seed = mask * 37 + v * 113 + biome.charCodeAt(biome.length - 1) * 19;
+          const seed = mask * 37 + v * 113 + biome.charCodeAt(0) * 23;
 
           const setPx = (px, py, rgb, a = 255) => {
             if (px < 0 || px >= SW || py < 0 || py >= SH) return;
@@ -891,17 +1112,16 @@
                 color = bayerCheck(lx, ly, 0.45 - distS * 0.1) ? DARK_STONE : CORE;
               }
 
-              if (biome === 'sector09' && !hasN && ly === 2 && (lx === 3 || lx === 12)) {
+              if ((biome === 'sector09' || biome === 'atrium') && !hasN && ly === 2 && (lx === 3 || lx === 12)) {
                 color = RIM_HIGH;
               }
-
               if (color !== CORE && isSeam) color = CRACK;
               setPx(px, py, color, 255);
             }
           }
 
           if (!hasN) {
-            const coverage = biome === 'sector09' ? 0.36 : (v === 3 ? 0.52 : 0.85);
+            const coverage = biome === 'cryo' ? 0.28 : (biome === 'sector09' ? 0.36 : (v === 3 ? 0.52 : 0.85));
             for (let lx = 0; lx < 16; lx++) {
               const mNoise = hash2D(lx, v, seed + 501);
               if (mNoise > coverage) continue;
@@ -909,7 +1129,7 @@
               setPx(px, OY, mNoise < 0.32 ? MOSS_TIP : MOSS_BRIGHT);
               setPx(px, OY + 1, MOSS_MID);
 
-              if (biome !== 'sector09' && hash2D(lx, 11, seed) < 0.44) {
+              if (!pal.noGrass && biome !== 'sector09' && hash2D(lx, 11, seed) < 0.44) {
                 const gh = 1 + Math.floor(hash2D(lx, 12, seed) * 3);
                 for (let g = 1; g <= gh; g++) {
                   setPx(px, OY - g, g === gh ? MOSS_TIP : MOSS_BRIGHT);
@@ -989,9 +1209,6 @@
       this.cornerDots[biome] = corners;
     }
 
-    // -----------------------------------------------------------------------
-    // C. PER-BIOME STEEL TRUSS PLATFORMS (XXXXX CROSS-BRACING + RIVETS)
-    // -----------------------------------------------------------------------
     bakeBiomeTrussTiles(biome, pal) {
       const list = [];
       for (let v = 0; v < 4; v++) {
@@ -1040,37 +1257,21 @@
           ctx.fillRect(2, 0, 3, 1);
           ctx.fillStyle = pal.flora.tip;
           ctx.fillRect(3, 0, 1, 1);
-          ctx.fillStyle = pal.flora.mid;
-          ctx.fillRect(4, 3, 1, 3);
         }
-        if (v === 2) {
-          ctx.fillStyle = pal.flora.mid;
-          ctx.fillRect(10, 0, 4, 2);
-          ctx.fillStyle = pal.flora.bright;
-          ctx.fillRect(11, 0, 2, 1);
-        }
-
         list.push(canvas);
       }
       this.trussTiles[biome] = list;
     }
 
     // -----------------------------------------------------------------------
-    // D. PROTAGONIST UNIT-04 "PICO" SPRITE SHEET (24x24 px)
+    // C. PROTAGONIST UNIT-04 "PICO" SPRITE SHEET (24x24 px)
     // -----------------------------------------------------------------------
     bakeRobotFrames() {
       const drawRobotBody = (opts) => {
         const { canvas, ctx } = createOffscreen(24, 24);
         const {
-          bobY = 0,
-          tiltX = 0,
-          stretchY = 0,
-          legL = 0,
-          legR = 0,
-          armL = 0,
-          armR = 0,
-          antY = 0,
-          unlitAnt = false
+          bobY = 0, tiltX = 0, stretchY = 0, legL = 0, legR = 0,
+          armL = 0, armR = 0, antY = 0, unlitAnt = false
         } = opts;
 
         const cx = 12 + tiltX;
@@ -1163,9 +1364,7 @@
         return canvas;
       };
 
-      this.robotFrames.sleep = [
-        drawRobotBody({ bobY: 2, stretchY: -1, antY: 1, unlitAnt: true })
-      ];
+      this.robotFrames.sleep = [drawRobotBody({ bobY: 2, stretchY: -1, antY: 1, unlitAnt: true })];
       this.robotFrames.idle = [
         drawRobotBody({ bobY: 0, antY: 0 }),
         drawRobotBody({ bobY: 0, antY: 0 }),
@@ -1180,93 +1379,88 @@
         drawRobotBody({ bobY: 0,  tiltX: 1, legL: -1, legR: 0, armL: 0, armR: 0 }),
         drawRobotBody({ bobY: 1,  tiltX: 1, legL: -1, legR: 1, armL: 1, armR: -1, antY: 1 })
       ];
-      this.robotFrames.jump = [
-        drawRobotBody({ bobY: -1, stretchY: 1, legL: -1, legR: -1, armL: -2, armR: -2, antY: 1 })
-      ];
-      this.robotFrames.fall = [
-        drawRobotBody({ bobY: 1, stretchY: -1, legL: 0, legR: -1, armL: -2, armR: -2, antY: -1 })
-      ];
+      this.robotFrames.jump = [drawRobotBody({ bobY: -1, stretchY: 1, legL: -1, legR: -1, armL: -2, armR: -2, antY: 1 })];
+      this.robotFrames.fall = [drawRobotBody({ bobY: 1, stretchY: -1, legL: 0, legR: -1, armL: -2, armR: -2, antY: -1 })];
     }
 
     // -----------------------------------------------------------------------
-    // E. ANCHORED SUBWAY & FACILITY SIGNS (DYNAMIC HEIGHT — ZERO OVERFLOW)
+    // D. ANCHORED SIGNS (ALL 7 SECTORS, DYNAMIC HEIGHT — ZERO OVERFLOW)
     // -----------------------------------------------------------------------
     bakeSigns() {
       this.signs.subway = this.buildSignCanvas({
-        w: 116,
-        boardW: 108,
-        boardY: 10,
-        header: 'SECTOR 04',
-        badgeColor: '#c24dff',
-        badgeBg: '#4f1e63',
-        glowColor: '#ff66d9',
+        w: 116, boardW: 108, header: 'SECTOR 04', badgeColor: '#c24dff', badgeBg: '#4f1e63',
+        glowColor: '#ff66d9', twoTubes: true, mountType: 'floor', mossColor: ['#1c5c46', '#38a86b', '#6ee89a'], seed: 707,
         lines: [
           { text: 'Train Station ↑', color: '#eef4ff' },
           { text: 'Tower T-124  ←',  color: '#cbdcf2' },
           { text: 'East Lift 07 →',  color: '#cbdcf2' },
           { text: 'Storage B4   ↓',  color: '#a3bcdb' }
-        ],
-        twoTubes: true,
-        mountType: 'floor',
-        mossColor: ['#1c5c46', '#38a86b', '#6ee89a'],
-        seed: 707
+        ]
       });
 
       this.signs.tunnel = this.buildSignCanvas({
-        w: 76,
-        boardW: 70,
-        boardY: 10,
-        header: 'SUB-02',
-        badgeColor: '#c24dff',
-        badgeBg: '#4f1e63',
-        glowColor: '#ff66d9',
+        w: 76, boardW: 70, header: 'SUB-02', badgeColor: '#c24dff', badgeBg: '#4f1e63',
+        glowColor: '#ff66d9', twoTubes: false, mountType: 'ceiling', mossColor: ['#1c5c46', '#38a86b', '#6ee89a'], seed: 808,
         lines: [
           { text: 'Station  ↑', color: '#eef4ff' },
           { text: 'Truss    →', color: '#b8cde6' }
-        ],
-        twoTubes: false,
-        mountType: 'ceiling',
-        mossColor: ['#1c5c46', '#38a86b', '#6ee89a'],
-        seed: 808
+        ]
+      });
+
+      this.signs.cryo = this.buildSignCanvas({
+        w: 96, boardW: 88, header: 'CRYO-00', badgeColor: '#705cff', badgeBg: '#1c1847',
+        glowColor: '#cfe8ff', twoTubes: false, mountType: 'wall', wallSide: 'left', mossColor: ['#2d3570', '#705cff', '#cfe8ff'], seed: 855,
+        lines: [
+          { text: 'Ping Sonar  •', color: '#cfe8ff' },
+          { text: 'Server Core ↑', color: '#a89cff' }
+        ]
       });
 
       this.signs.biolab = this.buildSignCanvas({
-        w: 98,
-        boardW: 86,
-        boardY: 10,
-        header: 'BIO-PUMP 07',
-        badgeColor: '#4dffdb',
-        badgeBg: '#124a42',
-        glowColor: '#4dffdb',
+        w: 98, boardW: 86, header: 'BIO-PUMP 07', badgeColor: '#4dffdb', badgeBg: '#124a42',
+        glowColor: '#4dffdb', twoTubes: false, mountType: 'wall', wallSide: 'left', mossColor: ['#156159', '#23b59b', '#80ffea'], seed: 909,
         lines: [
           { text: 'Hydro Core  ↑', color: '#e6fffb' },
           { text: 'Gondola Bay →', color: '#b2ebe2' },
           { text: 'Coolant Sump↓', color: '#8ad4ca' }
-        ],
-        twoTubes: false,
-        mountType: 'wall',
-        wallSide: 'left',
-        mossColor: ['#156159', '#23b59b', '#80ffea'],
-        seed: 909
+        ]
+      });
+
+      this.signs.amber = this.buildSignCanvas({
+        w: 98, boardW: 90, header: 'AMBER REEF', badgeColor: '#ffd27d', badgeBg: '#4a1b26',
+        glowColor: '#ffd27d', twoTubes: false, mountType: 'floor', mossColor: ['#8c373c', '#ff7369', '#ffd27d'], seed: 966,
+        lines: [
+          { text: 'Spore Pods  ↑', color: '#f2e5d5' },
+          { text: 'Centrifuge  →', color: '#ffd27d' }
+        ]
       });
 
       this.signs.reactor = this.buildSignCanvas({
-        w: 112,
-        boardW: 102,
-        boardY: 10,
-        header: 'CORE SHAFT 09',
-        badgeColor: '#ffaa33',
-        badgeBg: '#5c2b10',
-        glowColor: '#ffaa33',
+        w: 112, boardW: 102, header: 'CORE SHAFT 09', badgeColor: '#ffaa33', badgeBg: '#5c2b10',
+        glowColor: '#ffaa33', twoTubes: true, mountType: 'floor', mossColor: ['#52291c', '#8c4926', '#ffaa33'], seed: 1010,
         lines: [
-          { text: 'Surface Spire ↑', color: '#fff3db' },
-          { text: 'Valve Array   ←', color: '#edd4ad' },
-          { text: 'Magma Sump    ↓', color: '#cfab7e' }
-        ],
-        twoTubes: true,
-        mountType: 'floor',
-        mossColor: ['#52291c', '#8c4926', '#ffaa33'],
-        seed: 1010
+          { text: 'Viaduct Lift ↑', color: '#fff3db' },
+          { text: 'Valve Array  ←', color: '#edd4ad' },
+          { text: 'Magma Sump   ↓', color: '#cfab7e' }
+        ]
+      });
+
+      this.signs.viaduct = this.buildSignCanvas({
+        w: 100, boardW: 92, header: 'GALE SPAN 11', badgeColor: '#ffd27d', badgeBg: '#272e47',
+        glowColor: '#ffe0a3', twoTubes: false, mountType: 'floor', mossColor: ['#3a5754', '#688f78', '#a6c49f'], seed: 1111,
+        lines: [
+          { text: 'Zip Tram    →', color: '#eef4ff' },
+          { text: 'Watch Gusts !', color: '#ffd27d' }
+        ]
+      });
+
+      this.signs.atrium = this.buildSignCanvas({
+        w: 102, boardW: 94, header: 'ATRIUM DOME', badgeColor: '#d9f77a', badgeBg: '#25521d',
+        glowColor: '#d9f77a', twoTubes: false, mountType: 'floor', mossColor: ['#458a30', '#6cc447', '#d9f77a'], seed: 1212,
+        lines: [
+          { text: 'Sky Relay   ↑', color: '#ffffff' },
+          { text: 'Gantry Lift →', color: '#d9f77a' }
+        ]
       });
     }
 
@@ -1276,15 +1470,12 @@
         glowColor, lines, twoTubes, mountType, wallSide = 'left', mossColor, seed
       } = cfg;
 
-      // Exact dynamic height & width computation — guarantees ZERO text overflow
       const lineStep = 7;
       const boardH = 17 + lines.length * lineStep + 4;
       const h = boardY + boardH + (mountType === 'floor' ? 14 : 4);
 
       let maxTextW = measurePixelText(header) + 12;
-      for (const line of lines) {
-        maxTextW = Math.max(maxTextW, measurePixelText(line.text));
-      }
+      for (const line of lines) maxTextW = Math.max(maxTextW, measurePixelText(line.text));
       const boardW = Math.max(cfg.boardW, maxTextW + 14);
       const w = Math.max(cfg.w, boardW + (mountType === 'wall' ? 16 : 8));
 
@@ -1292,13 +1483,10 @@
       const rng = new SeededRNG(seed);
 
       let bx = Math.floor((w - boardW) / 2);
-      if (mountType === 'wall') {
-        bx = wallSide === 'left' ? 8 : w - boardW - 8;
-      }
+      if (mountType === 'wall') bx = wallSide === 'left' ? 8 : w - boardW - 8;
 
       const legOffsets = [];
 
-      // 1. Anchoring Hardware
       if (mountType === 'floor') {
         const legL = bx + 14;
         const legR = bx + boardW - 18;
@@ -1346,13 +1534,10 @@
           ctx.fillRect(armX, by, 8, 3);
           ctx.fillStyle = '#5a7394';
           ctx.fillRect(armX, by, 8, 1);
-          ctx.fillStyle = '#192333';
-          ctx.fillRect(armX + (wallSide === 'left' ? 2 : 3), by + 3, 3, 3);
         }
         legOffsets.push(...bYs);
       }
 
-      // 2. Metal Sign Cabinet
       ctx.fillStyle = '#080c12';
       ctx.fillRect(bx - 1, boardY - 1, boardW + 2, boardH + 2);
       ctx.fillStyle = '#384c66';
@@ -1368,33 +1553,11 @@
       for (let py = boardY + 2; py < boardY + boardH - 2; py++) {
         for (let px = bx + 2; px < bx + boardW - 2; px++) {
           const n = hash2D(px, py, seed);
-          if (n > 0.87) {
-            ctx.fillStyle = '#162538';
-            ctx.fillRect(px, py, 1, 1);
-          } else if (n < 0.08) {
-            ctx.fillStyle = '#0b131f';
-            ctx.fillRect(px, py, 1, 1);
-          }
+          if (n > 0.87) { ctx.fillStyle = '#162538'; ctx.fillRect(px, py, 1, 1); }
+          else if (n < 0.08) { ctx.fillStyle = '#0b131f'; ctx.fillRect(px, py, 1, 1); }
         }
       }
 
-      const rustCols = ['#4d221d', '#6e3226', '#8a422f'];
-      for (let i = 0; i < 8; i++) {
-        const rx = bx + rng.int(4, boardW - 6);
-        const ry = boardY + rng.int(2, boardH - 8);
-        const rLen = rng.int(3, 8);
-        for (let r = 0; r < rLen; r++) {
-          ctx.fillStyle = rustCols[r % rustCols.length];
-          ctx.fillRect(rx, ry + r, 1, 1);
-        }
-      }
-      ctx.fillStyle = '#7b94ad';
-      ctx.fillRect(bx + 3, boardY + 3, 1, 1);
-      ctx.fillRect(bx + boardW - 4, boardY + 3, 1, 1);
-      ctx.fillRect(bx + 3, boardY + boardH - 4, 1, 1);
-      ctx.fillRect(bx + boardW - 4, boardY + boardH - 4, 1, 1);
-
-      // 3. Header Badge & Safely Padded Typography
       const badgeW = measurePixelText(header) + 6;
       ctx.fillStyle = badgeBg;
       ctx.fillRect(bx + 5, boardY + 5, badgeW, 7);
@@ -1413,7 +1576,6 @@
         ly += lineStep;
       }
 
-      // 4. Moss Clinging to Cabinet Rim
       for (let mx = bx + 2; mx < bx + boardW - 2; mx++) {
         if (rng.chance(0.42)) {
           ctx.fillStyle = rng.chance(0.45) ? mossColor[1] : mossColor[0];
@@ -1422,14 +1584,9 @@
             ctx.fillStyle = mossColor[2];
             ctx.fillRect(mx, boardY - 2, 1, 1);
           }
-          if (rng.chance(0.20)) {
-            ctx.fillStyle = mossColor[0];
-            ctx.fillRect(mx, boardY + 1, 1, rng.int(1, 3));
-          }
         }
       }
 
-      // 5. Overhead Fluorescent Tube Fixtures
       const hoodW = twoTubes ? Math.floor(boardW * 0.35) : Math.floor(boardW * 0.54);
       const hoodPositions = twoTubes
         ? [bx + 10, bx + boardW - 10 - hoodW]
@@ -1446,9 +1603,6 @@
         ctx.fillRect(hx, 2, hoodW, 3);
         ctx.fillStyle = '#6782a6';
         ctx.fillRect(hx + 1, 2, hoodW - 2, 1);
-        ctx.fillStyle = mossColor[1];
-        ctx.fillRect(hx + 5, 1, 4, 1);
-
         tubeBounds.push({ x: hx + 2, y: 5, w: hoodW - 4, h: 2 });
       }
 
@@ -1462,7 +1616,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // F. LAMPS & BOLTED MOUNTING BRACKETS / FLANGE PLATES
+    // E. LAMPS, BRACKETS & ORBS
     // -----------------------------------------------------------------------
     bakeLampsAndBrackets() {
       const makeLamp = (shadeDark, shadeMid, shadeHi, rustCol, bulbOuter, bulbMid, bulbCore) => {
@@ -1501,6 +1655,9 @@
       this.cageLamp = makeLamp('#232f42', '#33445c', '#5e7694', '#733528', '#ff3b4d', '#ff7a59', '#fff3d6');
       this.bioLamp = makeLamp('#1f3836', '#2f5752', '#5ea69d', '#7d4a2b', '#18b89a', '#4dffdb', '#e6fffb');
       this.amberLamp = makeLamp('#2b1e1b', '#47312c', '#7a594d', '#9e3e24', '#e8681e', '#ffaa33', '#fff5cf');
+      this.cryoLamp = makeLamp('#101229', '#1e224a', '#705cff', '#2b2547', '#4a3dff', '#91a8ff', '#ffffff');
+      this.brassLamp = makeLamp('#3b2f18', '#6e582b', '#c9ad67', '#824c27', '#ffaa33', '#ffe38f', '#ffffff');
+      this.coralLamp = makeLamp('#381421', '#692434', '#c46c5e', '#733528', '#ff7369', '#ffd27d', '#fff5e0');
 
       {
         const { canvas, ctx } = createOffscreen(10, 5);
@@ -1544,9 +1701,6 @@
       this.wallBracketRight = makeWallArm(false);
     }
 
-    // -----------------------------------------------------------------------
-    // G. PULSING SECTOR ENERGY CORES / CHECKPOINT ORBS (32x32 px)
-    // -----------------------------------------------------------------------
     bakeOrbs() {
       const makeOrb = (rimDark, haloMid, haloBright) => {
         const { canvas, ctx } = createOffscreen(32, 32);
@@ -1577,16 +1731,18 @@
       this.energyOrb = makeOrb('#4a146b', '#c24dff', '#ff66d9');
       this.bioOrb = makeOrb('#0e524a', '#1dd6b8', '#75ffea');
       this.reactorOrb = makeOrb('#6b280b', '#ff7b1c', '#ffcc4d');
+      this.cryoOrb = makeOrb('#1f1959', '#705cff', '#cfe8ff');
+      this.amberOrb = makeOrb('#5c1f24', '#ff7369', '#ffd27d');
+      this.skyOrb = makeOrb('#25521d', '#6cc447', '#fff299');
     }
 
     // -----------------------------------------------------------------------
-    // H. RUBY CRYSTALS (ENHANCED FACET BEVELS & GLINTS) & BIO-MUSHROOMS
+    // F. CRYSTALS, MUSHROOMS, AMBER CORALS, ATRIUM PLANTERS, SHARDS, CRATES
     // -----------------------------------------------------------------------
     bakeCrystals() {
       const drawCluster = (w, h, shards, seed) => {
         const { canvas, ctx } = createOffscreen(w, h);
         const rng = new SeededRNG(seed);
-
         for (const s of shards) {
           const { bx, by, tx, ty, halfW } = s;
           const minY = Math.min(by, ty);
@@ -1600,21 +1756,18 @@
             for (let px = x0; px <= x1; px++) {
               const side = (px - cx) / (hw || 1);
               let col = '#c91234';
-              if (px === x0 || px === x1) col = '#24040b'; // crisp dark crystal edge
+              if (px === x0 || px === x1) col = '#24040b';
               else if (t > 0.84) col = '#ffffff';
               else if (t > 0.65 || side < -0.35) col = '#ff8fa3';
               else if (side < 0.12) col = '#ff1e42';
               else if (side < 0.55) col = '#9c0c27';
               else col = '#540615';
-              // Internal crystal refraction glint
               if (col === '#ff1e42' && hash2D(px, py, seed) > 0.88) col = '#ffc2ce';
               ctx.fillStyle = col;
               ctx.fillRect(px, py, 1, 1);
             }
           }
         }
-
-        // Rich weathered stone & lush moss cradle at base
         ctx.fillStyle = '#070b12';
         ctx.fillRect(1, h - 4, w - 2, 4);
         ctx.fillStyle = '#1b2638';
@@ -1631,14 +1784,13 @@
       };
 
       this.crystals.push(drawCluster(24, 24, [
-        { bx: 7,  by: 21, tx: 4,  ty: 8,  halfW: 2.6 },
-        { bx: 17, by: 21, tx: 20, ty: 7,  halfW: 2.6 },
-        { bx: 12, by: 22, tx: 13, ty: 2,  halfW: 3.6 }
+        { bx: 7, by: 21, tx: 4, ty: 8, halfW: 2.6 },
+        { bx: 17, by: 21, tx: 20, ty: 7, halfW: 2.6 },
+        { bx: 12, by: 22, tx: 13, ty: 2, halfW: 3.6 }
       ], 101));
-
       this.crystals.push(drawCluster(18, 20, [
-        { bx: 6,  by: 18, tx: 4,  ty: 6,  halfW: 2.5 },
-        { bx: 12, by: 18, tx: 14, ty: 3,  halfW: 3.2 }
+        { bx: 6, by: 18, tx: 4, ty: 6, halfW: 2.5 },
+        { bx: 12, by: 18, tx: 14, ty: 3, halfW: 3.2 }
       ], 202));
     }
 
@@ -1658,23 +1810,16 @@
           for (let dy = -m.rY; dy <= 1; dy++) {
             const span = Math.round(m.rX * Math.sqrt(Math.max(0, 1 - (dy / (m.rY + 0.5)) ** 2)));
             for (let dx = -span; dx <= span; dx++) {
-              const px = m.x + dx;
-              const py = m.capY + dy;
-              if (dy === 1) {
-                ctx.fillStyle = (dx & 1) ? '#99fff0' : '#26a694';
-              } else if (dy <= -m.rY + 1) {
-                ctx.fillStyle = '#e0fff9';
-              } else if (Math.abs(dx) === span) {
-                ctx.fillStyle = '#156159';
-              } else {
-                ctx.fillStyle = '#33e6c8';
-              }
+              const px = m.x + dx, py = m.capY + dy;
+              if (dy === 1) ctx.fillStyle = (dx & 1) ? '#99fff0' : '#26a694';
+              else if (dy <= -m.rY + 1) ctx.fillStyle = '#e0fff9';
+              else if (Math.abs(dx) === span) ctx.fillStyle = '#156159';
+              else ctx.fillStyle = '#33e6c8';
               ctx.fillRect(px, py, 1, 1);
             }
           }
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(m.x - 1, m.capY - m.rY + 1, 1, 1);
-          if (m.rX >= 4) ctx.fillRect(m.x + 2, m.capY - 1, 1, 1);
         }
         ctx.fillStyle = '#071a1c';
         ctx.fillRect(2, h - 3, w - 4, 3);
@@ -1688,15 +1833,68 @@
       };
 
       this.bioMushrooms.push(makeMushCluster(24, 24, [
-        { x: 6,  capY: 13, rX: 4, rY: 3, curve: -1 },
+        { x: 6, capY: 13, rX: 4, rY: 3, curve: -1 },
         { x: 18, capY: 11, rX: 4, rY: 3, curve: 1 },
-        { x: 12, capY: 6,  rX: 6, rY: 4, curve: 0.6 }
+        { x: 12, capY: 6, rX: 6, rY: 4, curve: 0.6 }
       ], 611));
-
       this.bioMushrooms.push(makeMushCluster(18, 20, [
-        { x: 6,  capY: 11, rX: 4, rY: 3, curve: -0.8 },
-        { x: 12, capY: 7,  rX: 5, rY: 4, curve: 0.8 }
+        { x: 6, capY: 11, rX: 4, rY: 3, curve: -0.8 },
+        { x: 12, capY: 7, rX: 5, rY: 4, curve: 0.8 }
       ], 612));
+    }
+
+    bakeAmberAndAtriumProps() {
+      // Translucent golden-honey amber & coral fossil cluster (24x24)
+      {
+        const { canvas, ctx } = createOffscreen(24, 24);
+        const spires = [
+          { bx: 6, by: 21, tx: 4, ty: 8, hw: 2.5 },
+          { bx: 17, by: 21, tx: 19, ty: 9, hw: 2.6 },
+          { bx: 12, by: 22, tx: 12, ty: 3, hw: 3.8 }
+        ];
+        for (const s of spires) {
+          for (let py = s.ty; py <= s.by; py++) {
+            const t = (py - s.by) / (s.ty - s.by);
+            const hw = Math.max(0.8, s.hw * (1 - t * 0.78));
+            const cx = lerp(s.bx, s.tx, t);
+            for (let px = Math.round(cx - hw); px <= Math.round(cx + hw); px++) {
+              const side = (px - cx) / hw;
+              ctx.fillStyle = t > 0.8 ? '#fff5d6' : (side < -0.25 ? '#ffd27d' : (side < 0.3 ? '#ff9b42' : '#8c332b'));
+              ctx.fillRect(px, py, 1, 1);
+            }
+          }
+        }
+        ctx.fillStyle = '#3b192b';
+        ctx.fillRect(2, 20, 20, 4);
+        ctx.fillStyle = '#ff7369';
+        ctx.fillRect(4, 19, 14, 2);
+        this.amberCrystals.push(canvas);
+      }
+
+      // Atrium sunlit tarnished-brass flowering garden urn (20x22)
+      {
+        const { canvas, ctx } = createOffscreen(20, 22);
+        // Brass pedestal planter
+        ctx.fillStyle = '#362c18';
+        ctx.fillRect(4, 13, 12, 9);
+        ctx.fillStyle = '#8c733a';
+        ctx.fillRect(5, 14, 10, 7);
+        ctx.fillStyle = '#e3c778';
+        ctx.fillRect(4, 13, 12, 2);
+        // Lush chartreuse foliage & pale gold blossoms
+        const rng = new SeededRNG(444);
+        for (let i = 0; i < 24; i++) {
+          const lx = rng.int(3, 16);
+          const ly = rng.int(4, 12);
+          ctx.fillStyle = rng.pick(['#25521d', '#458a30', '#6cc447', '#d9f77a']);
+          ctx.fillRect(lx, ly, 2, 2);
+          if (rng.chance(0.28)) {
+            ctx.fillStyle = rng.pick(['#fff299', '#ffb3d9', '#ffffff']);
+            ctx.fillRect(lx, ly - 1, 2, 2);
+          }
+        }
+        this.atriumPlanters.push(canvas);
+      }
     }
 
     bakeShardPickups() {
@@ -1708,17 +1906,11 @@
           const span = dy < 6 ? Math.round((dy / 6) * wMod) : Math.round(((12 - dy) / 6) * wMod);
           for (let dx = -span - 1; dx <= span + 1; dx++) {
             const x = cx + dx;
-            if (Math.abs(dx) === span + 1 || dy === 1 || dy === 12) {
-              ctx.fillStyle = '#24040b';
-            } else if (dx <= 0 && dy <= 5) {
-              ctx.fillStyle = '#ffffff';
-            } else if (dx < 0) {
-              ctx.fillStyle = '#ff8fa3';
-            } else if (dx === 0) {
-              ctx.fillStyle = '#ff1e42';
-            } else {
-              ctx.fillStyle = '#a30d2b';
-            }
+            if (Math.abs(dx) === span + 1 || dy === 1 || dy === 12) ctx.fillStyle = '#24040b';
+            else if (dx <= 0 && dy <= 5) ctx.fillStyle = '#ffffff';
+            else if (dx < 0) ctx.fillStyle = '#ff8fa3';
+            else if (dx === 0) ctx.fillStyle = '#ff1e42';
+            else ctx.fillStyle = '#a30d2b';
             ctx.fillRect(x, dy, 1, 1);
           }
         }
@@ -1726,9 +1918,6 @@
       }
     }
 
-    // -----------------------------------------------------------------------
-    // I. WEATHERED SUPPLY CRATES & RIVETED WALL BULKHEAD PIPE COLUMNS
-    // -----------------------------------------------------------------------
     bakeCrates() {
       const makeCrate = (w, h, seed) => {
         const { canvas, ctx } = createOffscreen(w, h);
@@ -1737,7 +1926,6 @@
         ctx.fillStyle = '#070a10';
         ctx.fillRect(0, 1, w, h - 1);
 
-        // Metallic wear & bevel dithering
         for (let y = 2; y < h - 1; y++) {
           for (let x = 1; x < w - 1; x++) {
             const n = hash2D(x, y, seed);
@@ -1752,7 +1940,6 @@
           }
         }
 
-        // Diagonal industrial hazard band
         const bandY = Math.floor(h * 0.45);
         for (let x = 3; x < w - 3; x++) {
           for (let y = bandY; y < bandY + 4; y++) {
@@ -1763,7 +1950,6 @@
           }
         }
 
-        // Corner steel brackets & rivets
         ctx.fillStyle = '#111824';
         ctx.fillRect(2, 5, w - 4, 1);
         ctx.fillRect(2, h - 4, w - 4, 1);
@@ -1773,26 +1959,19 @@
         ctx.fillRect(3, h - 3, 1, 1);
         ctx.fillRect(w - 4, h - 3, 1, 1);
 
-        // Rust streaks & grime
         for (let x = 2; x < w - 2; x++) {
           if (rng.chance(0.48)) {
-            const rCol = rng.chance(0.5) ? '#5e2c22' : '#85402b';
-            ctx.fillStyle = rCol;
+            ctx.fillStyle = rng.chance(0.5) ? '#5e2c22' : '#85402b';
             ctx.fillRect(x, h - rng.int(2, 5), 1, rng.int(2, 4));
           }
         }
 
-        // Overgrown moss + hanging vine tips over lid
         for (let x = 1; x < w - 1; x++) {
           if (rng.chance(0.62)) {
             ctx.fillStyle = '#1c5c46';
             ctx.fillRect(x, 1, 1, 2);
             ctx.fillStyle = rng.chance(0.45) ? '#38a86b' : '#6ee89a';
             ctx.fillRect(x, 0, 1, 1);
-            if (rng.chance(0.28)) {
-              ctx.fillStyle = '#1c5c46';
-              ctx.fillRect(x, 3, 1, rng.int(1, 4));
-            }
           }
         }
         return canvas;
@@ -1803,17 +1982,10 @@
     }
 
     bakePipeFixtures() {
-      // 4 animated pressure-gauge variants of the 32x48 Riveted Wall Bulkhead Column
-      const needleOffsets = [
-        [-2, -1],
-        [0, -2],
-        [2, -1],
-        [1, 1]
-      ];
+      const needleOffsets = [[-2, -1], [0, -2], [2, -1], [1, 1]];
       for (let f = 0; f < 4; f++) {
         const { canvas, ctx } = createOffscreen(32, 48);
 
-        // Full riveted steel backing plate behind pipe cluster & gauges
         ctx.fillStyle = '#070b12';
         ctx.fillRect(1, 0, 30, 48);
         ctx.fillStyle = '#182230';
@@ -1821,25 +1993,12 @@
         ctx.fillStyle = '#2c3d52';
         ctx.fillRect(2, 1, 28, 1);
         ctx.fillRect(2, 1, 1, 46);
-        ctx.fillStyle = '#0e1520';
-        ctx.fillRect(2, 45, 28, 2);
 
-        // Corner bolts on backing plate
         ctx.fillStyle = '#7b94ad';
-        for (const [bx, by] of [[4, 3], [27, 3], [4, 43], [27, 43], [4, 24], [27, 24]]) {
+        for (const [bx, by] of [[4, 3], [27, 3], [4, 43], [27, 43]]) {
           ctx.fillRect(bx, by, 1, 1);
         }
 
-        // Rust stains & moss speck on top backing lip
-        ctx.fillStyle = '#5e2c22';
-        ctx.fillRect(6, 36, 3, 6);
-        ctx.fillRect(23, 8, 2, 5);
-        ctx.fillStyle = '#1c5c46';
-        ctx.fillRect(5, 0, 7, 2);
-        ctx.fillStyle = '#38a86b';
-        ctx.fillRect(7, 0, 3, 1);
-
-        // Vertical steel pipe conduits bolted onto plate
         for (const [px, pw] of [[6, 6], [17, 8]]) {
           ctx.fillStyle = '#090e17';
           ctx.fillRect(px - 1, 0, pw + 2, 48);
@@ -1852,13 +2011,9 @@
             ctx.fillRect(px - 2, cy, pw + 4, 4);
             ctx.fillStyle = '#5f7a9c';
             ctx.fillRect(px - 1, cy + 1, pw + 2, 1);
-            ctx.fillStyle = '#9bb5d4';
-            ctx.fillRect(px - 1, cy + 1, 1, 1);
-            ctx.fillRect(px + pw, cy + 1, 1, 1);
           }
         }
 
-        // Red industrial shutoff valve wheel
         ctx.fillStyle = '#471515';
         ctx.fillRect(16, 16, 9, 9);
         ctx.fillStyle = '#a8322b';
@@ -1869,17 +2024,14 @@
         ctx.fillRect(18, 21, 2, 2);
         ctx.fillRect(21, 21, 2, 2);
 
-        // Analog Pressure Dial Gauge (x=4..12, y=15..23)
         ctx.fillStyle = '#090d14';
         ctx.fillRect(4, 15, 9, 9);
         ctx.fillStyle = '#485f7d';
         ctx.fillRect(5, 16, 7, 7);
         ctx.fillStyle = '#d8e6f5';
         ctx.fillRect(6, 17, 5, 5);
-        // Red danger tick on right edge of dial
         ctx.fillStyle = '#ff3b4d';
         ctx.fillRect(10, 18, 1, 2);
-        // Animated dial needle
         const [nx, ny] = needleOffsets[f];
         ctx.fillStyle = '#141c29';
         ctx.fillRect(8, 19, 1, 1);
@@ -1891,9 +2043,6 @@
       }
     }
 
-    // -----------------------------------------------------------------------
-    // J. DATA TERMINALS & SURFACE BROADCAST GATE
-    // -----------------------------------------------------------------------
     bakeTerminalAndExitGate() {
       {
         const { canvas, ctx } = createOffscreen(20, 24);
@@ -1911,10 +2060,6 @@
         ctx.fillRect(2, 13, 16, 4);
         ctx.fillStyle = '#4c6482';
         ctx.fillRect(3, 13, 14, 1);
-        ctx.fillStyle = '#7896ba';
-        ctx.fillRect(5, 14, 2, 1);
-        ctx.fillRect(9, 14, 2, 1);
-        ctx.fillRect(13, 14, 1, 1);
 
         ctx.fillStyle = '#080c12';
         ctx.fillRect(2, 1, 16, 13);
@@ -1968,17 +2113,11 @@
       }
     }
 
-    // -----------------------------------------------------------------------
-    // K. UPGRADED "FORGOTTEN" PROPS & ANIMATED SPRITE SHEETS
-    // -----------------------------------------------------------------------
     bakeUpgradedPropsAndDrones() {
-      // 1. Animated Bubbling Bio-Tanks / Coolant Sight-Vats (4 frames, 20x34 px)
       const makeVatFrames = (fluidDark, fluidMid, fluidTop, bubbleHi, rimMoss) => {
         const frames = [];
         for (let f = 0; f < 4; f++) {
           const { canvas, ctx } = createOffscreen(20, 34);
-
-          // Top domed steel cap & vent stub
           ctx.fillStyle = '#090d14';
           ctx.fillRect(8, 0, 4, 3);
           ctx.fillRect(3, 2, 14, 5);
@@ -1989,40 +2128,28 @@
           ctx.fillStyle = rimMoss;
           ctx.fillRect(5, 2, 4, 1);
 
-          // Bolted steel pedestal base (y = 27..33)
           ctx.fillStyle = '#080b12';
           ctx.fillRect(2, 27, 16, 7);
           ctx.fillStyle = '#28364a';
           ctx.fillRect(3, 28, 14, 5);
           ctx.fillStyle = '#536c8a';
           ctx.fillRect(3, 28, 14, 1);
-          // Bolted floor flange
           ctx.fillStyle = '#3d516b';
           ctx.fillRect(1, 31, 18, 3);
-          ctx.fillStyle = '#8fa9c7';
-          ctx.fillRect(2, 32, 1, 1);
-          ctx.fillRect(17, 32, 1, 1);
-          // Rust drip on base
-          ctx.fillStyle = '#6e3226';
-          ctx.fillRect(12, 29, 2, 3);
 
-          // Glass cylinder chamber (x = 4..15, y = 7..26)
           ctx.fillStyle = '#061114';
           ctx.fillRect(4, 7, 12, 20);
-          // Fluid fill (y = 10..26)
           ctx.fillStyle = fluidDark;
           ctx.fillRect(4, 10, 12, 17);
           ctx.fillStyle = fluidMid;
           ctx.fillRect(5, 11, 9, 15);
-          // Bright meniscus surface highlight
           ctx.fillStyle = fluidTop;
           ctx.fillRect(4, 10, 12, 1);
 
-          // Animated rising bubbles across 4 looping frames
           const bubbleSpecs = [
-            { x: 7,  baseY: 24, size: 2 },
+            { x: 7, baseY: 24, size: 2 },
             { x: 12, baseY: 21, size: 1 },
-            { x: 9,  baseY: 17, size: 2 },
+            { x: 9, baseY: 17, size: 2 },
             { x: 13, baseY: 14, size: 1 }
           ];
           for (let i = 0; i < bubbleSpecs.length; i++) {
@@ -2034,7 +2161,6 @@
             ctx.fillRect(b.x + wobble, by, b.size, b.size);
           }
 
-          // Vertical specular glass highlight strip + outer frame struts + center hoop
           ctx.fillStyle = '#e0fff9';
           ctx.globalAlpha = 0.55;
           ctx.fillRect(5, 8, 1, 18);
@@ -2045,10 +2171,6 @@
           ctx.fillRect(16, 7, 1, 20);
           ctx.fillStyle = '#4e6785';
           ctx.fillRect(3, 16, 14, 2);
-          ctx.fillStyle = '#8aa4c4';
-          ctx.fillRect(4, 16, 1, 1);
-          ctx.fillRect(15, 16, 1, 1);
-
           frames.push(canvas);
         }
         return frames;
@@ -2057,54 +2179,36 @@
       this.bioVatFrames = makeVatFrames('#0c4f49', '#19a892', '#80ffea', '#e6fffb', '#23b59b');
       this.magmaVatFrames = makeVatFrames('#5e1d0e', '#cf5019', '#ffbb45', '#fff2c2', '#8c4926');
 
-      // 2. Animated Hydraulic Pumping Pistons (pistonBase + pistonHead, 22x40 px)
       {
-        // Stationary Housing Base (22x40 px)
         const { canvas, ctx } = createOffscreen(22, 40);
-        // Heavy bolted top & collar flange
         ctx.fillStyle = '#080b12';
         ctx.fillRect(1, 0, 20, 26);
         ctx.fillStyle = '#253347';
         ctx.fillRect(2, 1, 18, 24);
         ctx.fillStyle = '#5c7594';
         ctx.fillRect(2, 1, 18, 2);
-        // Side guide columns extending full 40px height
         ctx.fillStyle = '#0b1018';
         ctx.fillRect(1, 24, 3, 16);
         ctx.fillRect(18, 24, 3, 16);
         ctx.fillStyle = '#384c66';
         ctx.fillRect(2, 24, 2, 15);
         ctx.fillRect(18, 24, 2, 15);
-        // Recessed central piston bore slot
         ctx.fillStyle = '#060910';
         ctx.fillRect(8, 20, 6, 6);
-        // Hazard warning trim on housing skirt
         for (let x = 3; x < 19; x++) {
           ctx.fillStyle = ((x >> 1) & 1) ? '#d49a2a' : '#18202c';
           ctx.fillRect(x, 21, 1, 3);
         }
-        // Corner bolts & rust weathering
-        ctx.fillStyle = '#9bb5d4';
-        ctx.fillRect(3, 3, 1, 1);
-        ctx.fillRect(18, 3, 1, 1);
-        ctx.fillStyle = '#733528';
-        ctx.fillRect(14, 14, 3, 4);
-        // Glowing pressure sight-strip (x = 4..6, y = 6..18)
         ctx.fillStyle = '#091417';
         ctx.fillRect(4, 6, 3, 13);
         ctx.fillStyle = '#33e6c8';
         ctx.fillRect(5, 9, 1, 9);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(5, 9, 1, 2);
-
         canvas.sightRect = { x: 4, y: 6, w: 3, h: 13 };
         this.pistonBase = canvas;
       }
 
       {
-        // Moving Chrome Piston Rod + Armored Hammer Head (22x40 px)
         const { canvas, ctx } = createOffscreen(22, 40);
-        // Chrome hydraulic rod
         ctx.fillStyle = '#090d14';
         ctx.fillRect(8, 0, 6, 29);
         ctx.fillStyle = '#7b94ad';
@@ -2112,7 +2216,6 @@
         ctx.fillStyle = '#eef4ff';
         ctx.fillRect(10, 0, 1, 29);
 
-        // Heavy armored press block at bottom (y = 28..39)
         ctx.fillStyle = '#080b12';
         ctx.fillRect(2, 28, 18, 12);
         ctx.fillStyle = '#364861';
@@ -2123,81 +2226,47 @@
           ctx.fillStyle = ((x >> 1) & 1) ? '#d9982b' : '#18202c';
           ctx.fillRect(x, 34, 1, 3);
         }
-        ctx.fillStyle = '#141c26';
-        ctx.fillRect(3, 37, 16, 2);
         this.pistonHead = canvas;
       }
 
-      // 3. Floor Pressure Switch / Lever Console (2 frames: unpressed/pressed, 16x10 px)
       for (let pressed = 0; pressed < 2; pressed++) {
         const { canvas, ctx } = createOffscreen(16, 10);
         const padY = pressed ? 5 : 3;
-        // Bolted base plate (y = 6..9)
         ctx.fillStyle = '#080b12';
         ctx.fillRect(0, 6, 16, 4);
         ctx.fillStyle = '#2a394f';
         ctx.fillRect(1, 7, 14, 2);
-        ctx.fillStyle = '#7b94ad';
-        ctx.fillRect(1, 7, 1, 1);
-        ctx.fillRect(14, 7, 1, 1);
-
-        // Depressible steel pad
         ctx.fillStyle = '#090d14';
         ctx.fillRect(2, padY, 12, 4);
         ctx.fillStyle = '#485f7d';
         ctx.fillRect(3, padY + 1, 10, 2);
         ctx.fillStyle = '#8aa4c7';
         ctx.fillRect(3, padY + 1, 10, 1);
-
-        // Glowing status LED indicator
         ctx.fillStyle = pressed ? '#6ee89a' : '#ff3b4d';
         ctx.fillRect(7, padY + 1, 2, 1);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(7, padY + 1, 1, 1);
-
-        // Tiny side lever nub
-        ctx.fillStyle = '#5c7594';
-        ctx.fillRect(13, pressed ? 5 : 3, 2, 2);
         this.switchFrames.push(canvas);
       }
 
-      // 4. Sliding Armored Blast Door (16x48 px)
       {
         const { canvas, ctx } = createOffscreen(16, 48);
         ctx.fillStyle = '#070a10';
         ctx.fillRect(0, 0, 16, 48);
-
-        // Armored steel slab body
         ctx.fillStyle = '#243142';
         ctx.fillRect(1, 1, 14, 46);
         ctx.fillStyle = '#485f7d';
         ctx.fillRect(2, 1, 2, 46);
-        ctx.fillStyle = '#161f2d';
-        ctx.fillRect(12, 1, 3, 46);
-
-        // Top & bottom hazard bands
         for (const hy of [3, 41]) {
           for (let x = 2; x < 14; x++) {
             ctx.fillStyle = ((x >> 1) & 1) ? '#d49a2a' : '#18202c';
             ctx.fillRect(x, hy, 1, 4);
           }
         }
-
-        // Interlocking horizontal ribs & center lock seam
         for (const ry of [12, 19, 28, 35]) {
           ctx.fillStyle = '#111824';
           ctx.fillRect(2, ry, 12, 2);
           ctx.fillStyle = '#5f7899';
           ctx.fillRect(2, ry, 12, 1);
         }
-
-        // Rust & moss weathering
-        ctx.fillStyle = '#6e3226';
-        ctx.fillRect(10, 14, 3, 4);
-        ctx.fillStyle = '#1c5c46';
-        ctx.fillRect(2, 0, 5, 2);
-
-        // Dual status LED socket
         ctx.fillStyle = '#090d14';
         ctx.fillRect(5, 22, 6, 4);
         ctx.fillStyle = '#ff3b4d';
@@ -2206,20 +2275,15 @@
         this.blastDoor = canvas;
       }
 
-      // 5. Hovering Maintenance Drone (4 frames, 16x14 px)
       const eyeXs = [6, 7, 8, 7];
       for (let f = 0; f < 4; f++) {
         const { canvas, ctx } = createOffscreen(16, 14);
         const bob = (f === 1 || f === 2) ? 0 : 1;
-
-        // Top twin stabilizer antennae
         ctx.fillStyle = '#3a4b66';
         ctx.fillRect(4, bob, 1, 2);
         ctx.fillRect(11, bob, 1, 2);
         ctx.fillStyle = f % 2 === 0 ? '#6ee89a' : '#ffaa33';
         ctx.fillRect(4, bob, 1, 1);
-
-        // Cylindrical weathered chassis (x = 3..12, y = 2+bob..9+bob)
         ctx.fillStyle = '#090d14';
         ctx.fillRect(2, 2 + bob, 12, 8);
         ctx.fillStyle = '#9db4d4';
@@ -2228,36 +2292,293 @@
         ctx.fillRect(4, 2 + bob, 7, 1);
         ctx.fillStyle = '#566d8c';
         ctx.fillRect(3, 4 + bob, 10, 5);
-        // Rust chip & hazard badge on side
-        ctx.fillStyle = '#7a3b29';
-        ctx.fillRect(11, 7 + bob, 2, 2);
-        ctx.fillStyle = '#d49a2a';
-        ctx.fillRect(3, 8 + bob, 3, 1);
-
-        // Dark recessed scanner visor + moving glowing eye
         ctx.fillStyle = '#0c101a';
         ctx.fillRect(4, 4 + bob, 8, 3);
-        const ex = eyeXs[f];
         ctx.fillStyle = f === 0 ? '#ffaa33' : '#7af5ff';
-        ctx.fillRect(ex, 5 + bob, 2, 1);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(ex, 5 + bob, 1, 1);
-
-        // Underside thruster nozzle & animated flickering jet flame
+        ctx.fillRect(eyeXs[f], 5 + bob, 2, 1);
         ctx.fillStyle = '#253347';
         ctx.fillRect(6, 10 + bob, 4, 1);
-        const flameH = (f % 2 === 0) ? 2 : 3;
         ctx.fillStyle = '#38b6ff';
-        ctx.fillRect(7, 11 + bob, 2, flameH);
+        ctx.fillRect(7, 11 + bob, 2, (f % 2 === 0) ? 2 : 3);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(7 + (f & 1), 11 + bob, 1, 1);
-
         this.droneFrames.push(canvas);
       }
     }
 
     // -----------------------------------------------------------------------
-    // L. HIGH-CRAFT MOVING MACHINERY SPRITES
+    // G. FOUR NEW BIOMES BESPOKE SPRITES (CRYO, VIADUCT, AMBER, ATRIUM)
+    // -----------------------------------------------------------------------
+    bakeNewBiomeSprites() {
+      // 1. CRYO: Sonar / Radar Pulse Pylons (2 frames: dormant / active, 16x28 px)
+      for (let active = 0; active < 2; active++) {
+        const { canvas, ctx } = createOffscreen(16, 28);
+        ctx.fillStyle = '#020206';
+        ctx.fillRect(2, 22, 12, 6);
+        ctx.fillStyle = '#181c3d';
+        ctx.fillRect(3, 23, 10, 4);
+        ctx.fillStyle = '#705cff';
+        ctx.fillRect(3, 23, 10, 1);
+        // Monolith column & acoustic emitter dish
+        ctx.fillStyle = '#070817';
+        ctx.fillRect(5, 6, 6, 17);
+        ctx.fillStyle = '#2a3066';
+        ctx.fillRect(6, 7, 4, 15);
+        ctx.fillStyle = active ? '#cfe8ff' : '#705cff';
+        ctx.fillRect(4, 2, 8, 6);
+        ctx.fillStyle = active ? '#ffffff' : '#181c3d';
+        ctx.fillRect(6, 3, 4, 4);
+        this.sonarPylonFrames.push(canvas);
+      }
+
+      // CRYO: Ceiling Spotlight Gimbal Housing (16x14 px)
+      {
+        const { canvas, ctx } = createOffscreen(16, 14);
+        ctx.fillStyle = '#04050c';
+        ctx.fillRect(3, 0, 10, 5);
+        ctx.fillStyle = '#2d3570';
+        ctx.fillRect(4, 1, 8, 3);
+        ctx.fillStyle = '#cfe8ff';
+        ctx.fillRect(5, 1, 6, 1);
+        // Searchlight barrel
+        ctx.fillStyle = '#101430';
+        ctx.fillRect(4, 5, 8, 7);
+        ctx.fillStyle = '#705cff';
+        ctx.fillRect(5, 5, 6, 2);
+        ctx.fillStyle = '#cfe8ff';
+        ctx.fillRect(5, 11, 6, 2);
+        this.spotlightHousing = canvas;
+      }
+
+      // CRYO: Hanging Icicles (2 variants)
+      for (let v = 0; v < 2; v++) {
+        const h = v === 0 ? 14 : 10;
+        const { canvas, ctx } = createOffscreen(8, h);
+        const spikes = v === 0 ? [[2, 13], [5, 9]] : [[3, 9]];
+        for (const [sx, sh] of spikes) {
+          for (let y = 0; y < sh; y++) {
+            const w = y < 3 ? 3 : (y < sh - 3 ? 2 : 1);
+            ctx.fillStyle = y > sh - 3 ? '#ffffff' : (y < 4 ? '#705cff' : '#cfe8ff');
+            ctx.fillRect(sx - (w > 2 ? 1 : 0), y, w, 1);
+          }
+        }
+        this.icicleSprites.push(canvas);
+      }
+
+      // 2. VIADUCT: Colossal Background Wind-Catcher Tower & 4-frame Rotating Canvas Sails (72x72 px)
+      {
+        const { canvas, ctx } = createOffscreen(36, 96);
+        ctx.fillStyle = '#272e47';
+        ctx.fillRect(10, 16, 16, 80);
+        ctx.fillStyle = '#3d476b';
+        ctx.fillRect(12, 16, 4, 80);
+        ctx.fillStyle = '#1b2033';
+        ctx.fillRect(22, 16, 4, 80);
+        ctx.fillStyle = '#49567a';
+        ctx.fillRect(8, 12, 20, 10);
+        this.windTurbineTower = canvas;
+      }
+      for (let f = 0; f < 4; f++) {
+        const size = 72;
+        const { canvas, ctx } = createOffscreen(size, size);
+        const cx = 36, cy = 36;
+        const baseAng = (f * Math.PI) / 8;
+        for (let b = 0; b < 4; b++) {
+          const ang = baseAng + (b * Math.PI) / 2;
+          const perp = ang + Math.PI / 2;
+          for (let r = 4; r <= 33; r++) {
+            const sx = cx + Math.cos(ang) * r;
+            const sy = cy + Math.sin(ang) * r;
+            // Steel spar
+            ctx.fillStyle = '#353e5e';
+            ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+            // Tattered wind-catcher canvas sail trailing behind spar
+            if (r > 10) {
+              const sailW = Math.round((r / 33) * 8);
+              for (let w = 1; w <= sailW; w++) {
+                const wx = Math.round(sx + Math.cos(perp) * w);
+                const wy = Math.round(sy + Math.sin(perp) * w);
+                ctx.fillStyle = (w === sailW) ? '#8fa1c7' : '#58668f';
+                ctx.fillRect(wx, wy, 1, 1);
+              }
+            }
+          }
+        }
+        ctx.fillStyle = '#272e47';
+        ctx.fillRect(cx - 4, cy - 4, 8, 8);
+        ctx.fillStyle = '#8fa1c7';
+        ctx.fillRect(cx - 2, cy - 2, 4, 4);
+        this.windSailFrames.push(canvas);
+      }
+
+      // VIADUCT: Exposed Cable-Car Zip Gondola (44x28 px, deck top at y = 21)
+      {
+        const { canvas, ctx } = createOffscreen(44, 28);
+        // Suspension yoke
+        ctx.fillStyle = '#252c45';
+        ctx.fillRect(20, 0, 4, 5);
+        ctx.fillRect(5, 4, 34, 2);
+        // Cabin frame & illuminated warm windows
+        ctx.fillStyle = '#121626';
+        ctx.fillRect(4, 6, 36, 15);
+        ctx.fillStyle = '#49567a';
+        ctx.fillRect(5, 7, 34, 13);
+        ctx.fillStyle = '#ffd27d';
+        ctx.fillRect(8, 9, 8, 6);
+        ctx.fillRect(19, 9, 6, 6);
+        ctx.fillRect(28, 9, 8, 6);
+        ctx.fillStyle = '#fff5cf';
+        ctx.fillRect(9, 10, 4, 3);
+        ctx.fillRect(29, 10, 4, 3);
+        // Walkable bottom deck platform (top at y = 21)
+        ctx.fillStyle = '#090b14';
+        ctx.fillRect(0, 21, 44, 7);
+        ctx.fillStyle = '#b4c2de';
+        ctx.fillRect(1, 21, 42, 1);
+        ctx.fillStyle = '#49567a';
+        ctx.fillRect(1, 22, 42, 3);
+        for (let x = 2; x < 42; x++) {
+          ctx.fillStyle = ((x >> 1) & 1) ? '#d9982b' : '#18202c';
+          ctx.fillRect(x, 24, 1, 2);
+        }
+        canvas.deckOffsetY = 21;
+        this.cableCarSprite = canvas;
+      }
+
+      // 3. AMBER: Bouncing Spore-Bladder Pods (3 frames: idle, squished, stretched, 24x18 px)
+      const podConfigs = [
+        { rx: 10, ry: 6, cy: 10 },
+        { rx: 12, ry: 4, cy: 13 },
+        { rx: 8,  ry: 8, cy: 8 }
+      ];
+      for (const cfg of podConfigs) {
+        const { canvas, ctx } = createOffscreen(24, 18);
+        // Rock anchor base
+        ctx.fillStyle = '#3b192b';
+        ctx.fillRect(4, 15, 16, 3);
+        for (let y = 0; y < 16; y++) {
+          for (let x = 0; x < 24; x++) {
+            const dx = (x - 12) / cfg.rx;
+            const dy = (y - cfg.cy) / cfg.ry;
+            const d = dx * dx + dy * dy;
+            if (d <= 1.0) {
+              if (d > 0.78) ctx.fillStyle = '#8c332b';
+              else if (dy < -0.25 && dx < 0.25) ctx.fillStyle = '#fff2c2';
+              else if (dy < 0.2) ctx.fillStyle = '#ffd27d';
+              else ctx.fillStyle = '#ff7369';
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+        this.sporePodFrames.push(canvas);
+      }
+
+      // AMBER: Giant Tarnished-Brass Centrifuge Ring (56x56 px)
+      {
+        const size = 56;
+        const { canvas, ctx } = createOffscreen(size, size);
+        const cx = 28, cy = 28;
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const r = Math.hypot(x - cx + 0.5, y - cy + 0.5);
+            if ((r >= 22 && r <= 26) || (r >= 14 && r <= 17)) {
+              const hi = (y < cy && x < cx + 10);
+              ctx.fillStyle = r > 25 ? '#261412' : (hi ? '#ffd27d' : '#8c6132');
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+        for (let a = 0; a < 8; a++) {
+          const ang = (a * Math.PI) / 4;
+          for (let r = 6; r <= 24; r++) {
+            ctx.fillStyle = r % 4 === 0 ? '#fff2c2' : '#734b24';
+            ctx.fillRect(Math.round(cx + Math.cos(ang) * r), Math.round(cy + Math.sin(ang) * r), 2, 2);
+          }
+        }
+        this.centrifugeRing = canvas;
+      }
+
+      // 4. ATRIUM: Diagonal Brass Gantry Lift, Sprinkler, Unfurling Giant Ferns, Golden Moths
+      {
+        const { canvas, ctx } = createOffscreen(44, 16);
+        ctx.fillStyle = '#362c18';
+        ctx.fillRect(0, 6, 44, 8);
+        ctx.fillStyle = '#e3c778';
+        ctx.fillRect(1, 6, 42, 2);
+        ctx.fillStyle = '#8c733a';
+        ctx.fillRect(1, 8, 42, 4);
+        // Brass safety rails at corners
+        ctx.fillStyle = '#c9ad67';
+        ctx.fillRect(2, 0, 2, 6);
+        ctx.fillRect(40, 0, 2, 6);
+        ctx.fillRect(2, 0, 40, 1);
+        canvas.deckOffsetY = 6;
+        this.gantryLiftSprite = canvas;
+      }
+
+      {
+        const { canvas, ctx } = createOffscreen(12, 10);
+        ctx.fillStyle = '#362c18';
+        ctx.fillRect(4, 6, 4, 4);
+        ctx.fillStyle = '#c9ad67';
+        ctx.fillRect(2, 4, 8, 3);
+        ctx.fillStyle = '#fff0a6';
+        ctx.fillRect(5, 1, 2, 3);
+        this.sprinklerSprite = canvas;
+      }
+
+      // Unfurling Giant Fern Platform (4 stages, 32x16 px)
+      for (let st = 0; st < 4; st++) {
+        const { canvas, ctx } = createOffscreen(32, 16);
+        const reach = st === 0 ? 8 : (st === 1 ? 16 : (st === 2 ? 24 : 31));
+        // Base stem anchored on left wall/floor
+        ctx.fillStyle = '#25521d';
+        ctx.fillRect(0, 4, 4, 8);
+        for (let x = 2; x <= reach; x++) {
+          const t = x / reach;
+          const archY = st < 3 ? Math.round(6 - Math.sin(t * Math.PI) * (4 - st)) : 4;
+          ctx.fillStyle = '#458a30';
+          ctx.fillRect(x, archY, 1, 4);
+          ctx.fillStyle = '#6cc447';
+          ctx.fillRect(x, archY, 1, 2);
+          if ((x % 3) === 0) {
+            ctx.fillStyle = '#d9f77a';
+            ctx.fillRect(x, archY - 1, 2, 2);
+            if (st >= 2) {
+              ctx.fillStyle = '#25521d';
+              ctx.fillRect(x, archY + 4, 2, 2);
+            }
+          }
+        }
+        if (st < 3) {
+          // Curled spiral fiddlehead bud at tip
+          ctx.fillStyle = '#d9f77a';
+          ctx.fillRect(reach - 3, 2, 4, 5);
+          ctx.fillStyle = '#25521d';
+          ctx.fillRect(reach - 2, 3, 2, 2);
+        }
+        this.fernFrames.push(canvas);
+      }
+
+      // Pale-gold fluttering moths (2 wing-flap frames, 6x5 px)
+      for (let f = 0; f < 2; f++) {
+        const { canvas, ctx } = createOffscreen(6, 5);
+        ctx.fillStyle = '#fff5bd';
+        if (f === 0) {
+          ctx.fillRect(0, 0, 2, 3);
+          ctx.fillRect(4, 0, 2, 3);
+        } else {
+          ctx.fillRect(1, 2, 1, 2);
+          ctx.fillRect(4, 2, 1, 2);
+        }
+        ctx.fillStyle = '#b89c56';
+        ctx.fillRect(2, 2, 2, 2);
+        this.mothFrames.push(canvas);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // H. HIGH-CRAFT MOVING MACHINERY SPRITES
     // -----------------------------------------------------------------------
     bakeMachinerySprites() {
       {
@@ -2289,19 +2610,12 @@
 
         for (let x = 2; x < w - 2; x++) {
           for (let y = dy + 3; y < dy + 6; y++) {
-            const stripe = ((x + y) % 6) < 3;
-            ctx.fillStyle = stripe ? '#d49a2a' : '#18202c';
+            ctx.fillStyle = ((x + y) % 6) < 3 ? '#d49a2a' : '#18202c';
             ctx.fillRect(x, y, 1, 1);
           }
         }
-
         ctx.fillStyle = '#212e40';
         ctx.fillRect(1, dy + 6, w - 2, 3);
-        ctx.fillStyle = '#627c9c';
-        for (let rx = 4; rx < w - 4; rx += 8) {
-          ctx.fillRect(rx, dy + 7, 1, 1);
-        }
-
         canvas.deckOffsetY = dy;
         canvas.beaconCoords = [{ x: 3, y: 8 }, { x: w - 6, y: 8 }];
         this.elevatorCage = canvas;
@@ -2319,11 +2633,9 @@
 
         for (let y = 0; y < 18; y++) {
           for (let x = 0; x < 18; x++) {
-            const dx = x - cx + 0.5;
-            const dy = y - cy + 0.5;
-            const r = Math.hypot(dx, dy);
+            const r = Math.hypot(x - cx + 0.5, y - cy + 0.5);
             if (r <= 7.4 && r >= 5.2) {
-              ctx.fillStyle = r > 6.5 ? '#0b1018' : (dy < 0 ? '#6b87a8' : '#354861');
+              ctx.fillStyle = r > 6.5 ? '#0b1018' : (y < cy ? '#6b87a8' : '#354861');
               ctx.fillRect(x, y, 1, 1);
             }
           }
@@ -2333,10 +2645,8 @@
         for (let s = 0; s < 4; s++) {
           const ang = baseAng + (s * Math.PI) / 2;
           for (let step = 1; step <= 5; step++) {
-            const sx = Math.round(cx + Math.cos(ang) * step);
-            const sy = Math.round(cy + Math.sin(ang) * step);
             ctx.fillStyle = '#4e6785';
-            ctx.fillRect(sx, sy, 1, 1);
+            ctx.fillRect(Math.round(cx + Math.cos(ang) * step), Math.round(cy + Math.sin(ang) * step), 1, 1);
           }
         }
         ctx.fillStyle = '#090d14';
@@ -2356,18 +2666,10 @@
         ctx.fillRect(2, 3, 10, 15);
         ctx.fillStyle = '#475e7a';
         ctx.fillRect(2, 3, 10, 2);
-        ctx.fillStyle = '#121a26';
-        ctx.fillRect(2, 7, 10, 2);
-        ctx.fillRect(2, 12, 10, 2);
         for (let x = 3; x < 11; x++) {
           ctx.fillStyle = (x & 1) ? '#c98e2b' : '#18202c';
           ctx.fillRect(x, 15, 1, 2);
         }
-        ctx.fillStyle = '#6f8aa8';
-        ctx.fillRect(0, 5, 2, 3);
-        ctx.fillRect(0, 14, 2, 3);
-        ctx.fillRect(12, 5, 2, 3);
-        ctx.fillRect(12, 14, 2, 3);
         this.counterweight = canvas;
       }
 
@@ -2399,7 +2701,6 @@
         ctx.fillStyle = '#1b2636';
         ctx.fillRect(4, 4, 2, 10);
         ctx.fillRect(w - 6, 4, 2, 10);
-
         ctx.fillStyle = '#253347';
         ctx.fillRect(19, 3, 6, 3);
         ctx.fillStyle = '#ffaa33';
@@ -2418,9 +2719,6 @@
           ctx.fillStyle = ((x >> 1) & 1) ? '#c98e2b' : '#18202c';
           ctx.fillRect(x, dy + 3, 1, 2);
         }
-        ctx.fillStyle = '#243245';
-        ctx.fillRect(2, dy + 5, w - 4, 2);
-
         canvas.deckOffsetY = dy;
         canvas.lanternOffset = { x: 22, y: 7 };
         this.gondolaCar = canvas;
@@ -2430,14 +2728,11 @@
         const size = 36;
         const { canvas, ctx } = createOffscreen(size, size);
         const cx = 18, cy = 18;
-
         for (let y = 0; y < size; y++) {
           for (let x = 0; x < size; x++) {
-            const dx = x - cx + 0.5;
-            const dy = y - cy + 0.5;
-            const r = Math.hypot(dx, dy);
+            const r = Math.hypot(x - cx + 0.5, y - cy + 0.5);
             if (r <= 17.5 && r >= 14.5) {
-              ctx.fillStyle = r > 16.5 ? '#060a10' : (dy < 0 ? '#3a4e68' : '#1c2838');
+              ctx.fillStyle = r > 16.5 ? '#060a10' : (y < cy ? '#3a4e68' : '#1c2838');
               ctx.fillRect(x, y, 1, 1);
             } else if (r < 14.5) {
               ctx.fillStyle = '#040812';
@@ -2445,7 +2740,6 @@
             }
           }
         }
-
         const baseAng = (f * Math.PI) / 12;
         for (let b = 0; b < 6; b++) {
           const ang = baseAng + (b * Math.PI) / 3;
@@ -2455,27 +2749,15 @@
             const by = cy + Math.sin(ang) * r;
             const width = 1.2 + (r / 13) * 1.6;
             for (let w = -width; w <= width; w += 0.7) {
-              const px = Math.round(bx + Math.cos(perp) * w);
-              const py = Math.round(by + Math.sin(perp) * w);
               ctx.fillStyle = w < 0 ? '#4e6887' : '#243347';
-              ctx.fillRect(px, py, 1, 1);
+              ctx.fillRect(Math.round(bx + Math.cos(perp) * w), Math.round(by + Math.sin(perp) * w), 1, 1);
             }
           }
         }
-
         ctx.fillStyle = '#0c111a';
         ctx.fillRect(cx - 3, cy - 3, 6, 6);
         ctx.fillStyle = '#6b87a8';
         ctx.fillRect(cx - 2, cy - 2, 4, 4);
-        ctx.fillStyle = '#9db4d4';
-        ctx.fillRect(cx - 1, cy - 1, 2, 2);
-
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI) / 4;
-          ctx.fillStyle = '#7b94ad';
-          ctx.fillRect(Math.round(cx + Math.cos(a) * 15.8), Math.round(cy + Math.sin(a) * 15.8), 1, 1);
-        }
-
         this.turbineFrames.push(canvas);
       }
 
@@ -2491,14 +2773,12 @@
         ctx.fillRect(5, 5, 4, 4);
         ctx.fillStyle = '#ffcf6e';
         ctx.fillRect(6, 6, 2, 2);
-        ctx.fillStyle = '#0c111a';
-        ctx.fillRect(6, 1, 2, 2);
         this.steamValve = canvas;
       }
     }
 
     // -----------------------------------------------------------------------
-    // M. LAYER 7: EXTREME BLURRED FOREGROUND DEPTH-OF-FIELD SILHOUETTES
+    // I. LAYER 7: EXTREME BLURRED FOREGROUND DEPTH-OF-FIELD SILHOUETTES
     // -----------------------------------------------------------------------
     bakeBlurredForegroundDOF() {
       const makeBlurredChunk = (w, h, drawFn) => {
@@ -2535,10 +2815,7 @@
           ctx.beginPath();
           ctx.moveTo(-10, h + 12);
           ctx.lineTo(-10, h - 10);
-          for (let x = 0; x <= w + 10; x += 14) {
-            const peak = rng.range(10, 32);
-            ctx.lineTo(x, h - peak);
-          }
+          for (let x = 0; x <= w + 10; x += 14) ctx.lineTo(x, h - rng.range(10, 32));
           ctx.lineTo(w + 10, h + 12);
           ctx.closePath();
           ctx.fill();
@@ -2551,22 +2828,10 @@
           ctx.fillStyle = '#030408';
           ctx.beginPath();
           ctx.moveTo(-10, -12);
-          for (let x = 0; x <= w + 10; x += 12) {
-            const drop = rng.range(8, 28);
-            ctx.lineTo(x, drop);
-          }
+          for (let x = 0; x <= w + 10; x += 12) ctx.lineTo(x, rng.range(8, 28));
           ctx.lineTo(w + 10, -12);
           ctx.closePath();
           ctx.fill();
-
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = '#030408';
-          for (let rx = 22; rx < w - 20; rx += rng.int(36, 68)) {
-            ctx.beginPath();
-            ctx.moveTo(rx, 0);
-            ctx.quadraticCurveTo(rx + rng.range(-8, 8), 18, rx + rng.range(-5, 5), rng.range(24, 36));
-            ctx.stroke();
-          }
         }));
       }
 
@@ -2575,9 +2840,7 @@
         ctx.fillStyle = '#030408';
         ctx.beginPath();
         ctx.moveTo(-10, -10);
-        for (let y = 0; y <= h + 10; y += 16) {
-          ctx.lineTo(rng.range(14, 32), y);
-        }
+        for (let y = 0; y <= h + 10; y += 16) ctx.lineTo(rng.range(14, 32), y);
         ctx.lineTo(-10, h + 10);
         ctx.closePath();
         ctx.fill();

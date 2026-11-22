@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>UNIT-04 // PICO — Subterranean Ascent</title>
+  <title>UNIT-04 // PICO — 7-Chapter Atmospheric Ascent</title>
+  <link rel="icon" href="data:," />
   <style>
     * {
       margin: 0;
@@ -31,13 +32,71 @@
 </head>
 <body>
 <canvas id="displayCanvas"></canvas>
-<script src="assets.js"></script>
-<script src="world.js"></script>
+<script>
+  window.__loadErrors = [];
+  window.__halted = false;
+
+  (function initCanvasSizeEarly() {
+    const c = document.getElementById('displayCanvas');
+    const vw = window.innerWidth || 960;
+    const vh = window.innerHeight || 540;
+    const targetAspect = 16 / 9;
+    let cw = vw;
+    let ch = Math.floor(vw / targetAspect);
+    if (ch > vh) {
+      ch = vh;
+      cw = Math.floor(vh * targetAspect);
+    }
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.style.width = `${cw}px`;
+    c.style.height = `${ch}px`;
+    c.width = Math.max(480, Math.round(cw * dpr));
+    c.height = Math.max(270, Math.round(ch * dpr));
+  })();
+
+  function showCanvasError(msg) {
+    window.__halted = true;
+    const c = document.getElementById('displayCanvas');
+    const ctx = c && c.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#070b14';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#ff6b81';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText('BOOT ERROR:', 36, 60);
+    ctx.fillStyle = '#eef4ff';
+    ctx.font = '16px monospace';
+    const text = String(msg);
+    for (let i = 0, y = 96; i < text.length; i += 78, y += 24) {
+      ctx.fillText(text.slice(i, i + 78), 36, y);
+    }
+  }
+
+  window.addEventListener('error', function (e) {
+    const file = e.filename ? e.filename.split('/').pop() : 'inline';
+    const line = e.lineno ? `:${e.lineno}` : '';
+    window.__loadErrors.push(`${e.message || 'Script error'} @ ${file}${line}`);
+    showCanvasError(window.__loadErrors.join(' | '));
+  });
+</script>
+<script src="assets.js" onerror="window.__loadErrors.push('Failed to load assets.js'); showCanvasError(window.__loadErrors.join(' | '));"></script>
+<script src="world.js" onerror="window.__loadErrors.push('Failed to load world.js'); showCanvasError(window.__loadErrors.join(' | '));"></script>
 <script>
 (() => {
   'use strict';
 
+  if (window.__loadErrors.length > 0) {
+    showCanvasError(window.__loadErrors.join(' | '));
+    return;
+  }
+
   const GAME = window.GAME;
+  if (!GAME || !GAME.AssetFactory || !GAME.LevelBuilder) {
+    showCanvasError('assets.js or world.js missing GAME exports.');
+    return;
+  }
+
   const {
     PIXEL_W,
     PIXEL_H,
@@ -56,7 +115,7 @@
   } = GAME;
 
   // =========================================================================
-  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (BIOME DRONE, MACHINERY, DOORS, ZAPS)
+  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (ALL 7 BIOMES + NEW MECHANICS)
   // =========================================================================
   class AudioEngine {
     constructor() {
@@ -124,8 +183,16 @@
     setBiome(biome) {
       this.currentBiome = biome;
       if (!this.droneFilter || !this.ctx) return;
-      const freq = biome === 'sector07' ? 195 : (biome === 'sector09' ? 105 : 135);
-      this.droneFilter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.35);
+      const freqMap = {
+        sector04: 135,
+        cryo: 85,
+        sector07: 195,
+        amber: 155,
+        sector09: 105,
+        viaduct: 340,
+        atrium: 240
+      };
+      this.droneFilter.frequency.setTargetAtTime(freqMap[biome] || 135, this.ctx.currentTime, 0.35);
     }
 
     playStep(isMetal) {
@@ -136,10 +203,8 @@
       osc.type = isMetal ? 'triangle' : 'sine';
       osc.frequency.setValueAtTime(isMetal ? 275 : 122, t);
       osc.frequency.exponentialRampToValueAtTime(isMetal ? 115 : 54, t + 0.045);
-
       gain.gain.setValueAtTime(isMetal ? 0.08 : 0.06, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-
       osc.connect(gain);
       gain.connect(this.master);
       osc.start(t);
@@ -178,6 +243,79 @@
       osc.stop(t + 0.1);
     }
 
+    playSonarPing() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      [880, 1320].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + i * 0.06);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.65, t + i * 0.06 + 0.9);
+        gain.gain.setValueAtTime(0.001, t + i * 0.06);
+        gain.gain.linearRampToValueAtTime(i === 0 ? 0.13 : 0.06, t + i * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 1.05);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.06);
+        osc.stop(t + i * 0.06 + 1.1);
+      });
+    }
+
+    playThunder() {
+      if (!this.started || this.muted || !this.noiseBuffer) return;
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(220, t);
+      lp.frequency.exponentialRampToValueAtTime(65, t + 1.4);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.14, t + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.45);
+      src.connect(lp);
+      lp.connect(gain);
+      gain.connect(this.master);
+      src.start(t);
+      src.stop(t + 1.5);
+    }
+
+    playPodBounce() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(155, t);
+      osc.frequency.exponentialRampToValueAtTime(480, t + 0.09);
+      osc.frequency.exponentialRampToValueAtTime(290, t + 0.24);
+      gain.gain.setValueAtTime(0.14, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    }
+
+    playFernUnfurl() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      [392, 493.88, 659.25].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t + i * 0.065);
+        gain.gain.setValueAtTime(0.06, t + i * 0.065);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.065 + 0.28);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.065);
+        osc.stop(t + i * 0.065 + 0.3);
+      });
+    }
+
     playShardPickup(count) {
       if (!this.started || this.muted) return;
       const t = this.ctx.currentTime;
@@ -200,8 +338,7 @@
     playOrbActivate() {
       if (!this.started || this.muted) return;
       const t = this.ctx.currentTime;
-      const chord = [196.0, 293.66, 392.0, 587.33, 739.99];
-      chord.forEach((freq, idx) => {
+      [196.0, 293.66, 392.0, 587.33, 739.99].forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = idx === 0 ? 'triangle' : 'sine';
@@ -276,37 +413,17 @@
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(98, t);
       osc.frequency.linearRampToValueAtTime(58, t + 0.72);
-
       const lp = this.ctx.createBiquadFilter();
       lp.type = 'lowpass';
       lp.frequency.value = 220;
-
       gain.gain.setValueAtTime(0.001, t);
       gain.gain.linearRampToValueAtTime(0.085, t + 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.78);
-
       osc.connect(lp);
       lp.connect(gain);
       gain.connect(this.master);
       osc.start(t);
       osc.stop(t + 0.8);
-
-      if (this.noiseBuffer) {
-        const src = this.ctx.createBufferSource();
-        src.buffer = this.noiseBuffer;
-        const bp = this.ctx.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.value = 800;
-        const ng = this.ctx.createGain();
-        ng.gain.setValueAtTime(0.001, t);
-        ng.gain.linearRampToValueAtTime(0.04, t + 0.1);
-        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
-        src.connect(bp);
-        bp.connect(ng);
-        ng.connect(this.master);
-        src.start(t);
-        src.stop(t + 0.75);
-      }
     }
 
     playElectricZap() {
@@ -323,22 +440,6 @@
       gain.connect(this.master);
       osc.start(t);
       osc.stop(t + 0.085);
-
-      if (this.noiseBuffer) {
-        const src = this.ctx.createBufferSource();
-        src.buffer = this.noiseBuffer;
-        const hp = this.ctx.createBiquadFilter();
-        hp.type = 'highpass';
-        hp.frequency.value = 3200;
-        const ng = this.ctx.createGain();
-        ng.gain.setValueAtTime(0.04, t);
-        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-        src.connect(hp);
-        hp.connect(ng);
-        ng.connect(this.master);
-        src.start(t);
-        src.stop(t + 0.075);
-      }
     }
 
     playMachineryStart() {
@@ -349,15 +450,12 @@
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(64, t);
       osc.frequency.exponentialRampToValueAtTime(108, t + 0.35);
-
       const lp = this.ctx.createBiquadFilter();
       lp.type = 'lowpass';
       lp.frequency.value = 260;
-
       gain.gain.setValueAtTime(0.001, t);
       gain.gain.linearRampToValueAtTime(0.055, t + 0.06);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
-
       osc.connect(lp);
       lp.connect(gain);
       gain.connect(this.master);
@@ -373,14 +471,11 @@
       osc.type = 'square';
       osc.frequency.setValueAtTime(145, t);
       osc.frequency.exponentialRampToValueAtTime(48, t + 0.09);
-
       const lp = this.ctx.createBiquadFilter();
       lp.type = 'lowpass';
       lp.frequency.value = 380;
-
       gain.gain.setValueAtTime(0.09, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
-
       osc.connect(lp);
       lp.connect(gain);
       gain.connect(this.master);
@@ -393,17 +488,14 @@
       const t = this.ctx.currentTime;
       const src = this.ctx.createBufferSource();
       src.buffer = this.noiseBuffer;
-
       const bp = this.ctx.createBiquadFilter();
       bp.type = 'bandpass';
       bp.frequency.setValueAtTime(2100, t);
       bp.Q.value = 1.6;
-
       const gain = this.ctx.createGain();
       gain.gain.setValueAtTime(0.001, t);
       gain.gain.linearRampToValueAtTime(0.055, t + 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
-
       src.connect(bp);
       bp.connect(gain);
       gain.connect(this.master);
@@ -431,8 +523,7 @@
     playSurfaceFinale() {
       if (!this.started || this.muted) return;
       const t = this.ctx.currentTime;
-      const notes = [261.63, 329.63, 392.0, 493.88, 587.33, 783.99];
-      notes.forEach((freq, i) => {
+      [261.63, 329.63, 392.0, 493.88, 587.33, 783.99].forEach((freq, i) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = i < 2 ? 'triangle' : 'sine';
@@ -449,7 +540,7 @@
   }
 
   // =========================================================================
-  // 2. UPGRADED LIGHTING ENGINE (CLEAN CIRCULAR PLAYER AURA + FULL WORLD GLOW)
+  // 2. UPGRADED LIGHTING ENGINE (CRYO SPOTLIGHTS, SONAR RINGS, SUNBEAMS, BLOOM)
   // =========================================================================
   class LightingEngine {
     constructor() {
@@ -483,9 +574,8 @@
       const lctx = this.lightCtx;
       lctx.clearRect(0, 0, this.lightW, this.lightH);
 
-      // 1. Deep Biome-Tinted Ambient Shadow Layer
       lctx.globalCompositeOperation = 'source-over';
-      lctx.fillStyle = stateFlags.finaleActive ? 'rgba(6, 12, 26, 0.48)' : pal.ambientShadow;
+      lctx.fillStyle = stateFlags.finaleActive ? 'rgba(18, 28, 42, 0.25)' : pal.ambientShadow;
       lctx.fillRect(0, 0, this.lightW, this.lightH);
 
       lctx.globalCompositeOperation = 'destination-out';
@@ -508,19 +598,18 @@
       const px = playerInterp.x + player.w * 0.5;
       const py = playerInterp.y + player.h * 0.45;
 
-      // Clean, soft atmospheric circular aura around PICO (NO directional cone)
-      carveRadial(px, py, stateFlags.awakened ? 92 : 44, stateFlags.awakened ? 0.94 : 0.65);
+      // Tighter personal aura in Cryo-Archive so pitch-black tension hits hard!
+      const playerRad = level.biome === 'cryo' ? 68 : 92;
+      carveRadial(px, py, stateFlags.awakened ? playerRad : 44, stateFlags.awakened ? 0.96 : 0.65);
 
-      // Swinging Lamps light carve
       const lampFlickers = [];
       for (const lamp of level.lamps) {
         const flk = this.getFlicker(time, lamp.seed, false);
         lampFlickers.push(flk);
-        carveRadial(lamp.x + 10, lamp.y + 16, 118 * flk, 0.96);
-        carveRadial(lamp.x + 10, lamp.y + 44, 88 * flk, 0.65);
+        carveRadial(lamp.x + 10, lamp.y + 16, (level.biome === 'cryo' ? 76 : 118) * flk, 0.96);
+        carveRadial(lamp.x + 10, lamp.y + 44, (level.biome === 'cryo' ? 54 : 88) * flk, 0.65);
       }
 
-      // Signs carve
       const signFlickers = [];
       for (const sign of level.signs) {
         const flk = this.getFlicker(time, sign.flickerSeed, true);
@@ -530,75 +619,81 @@
         carveRadial(cx, cy, (sign.type === 'subway' || sign.type === 'reactor' ? 148 : 102) * (0.7 + 0.3 * flk), 0.98);
       }
 
-      // Energy Core Orb carve
       if (level.orb) {
         const o = level.orb;
         const orbRad = (o.activated ? 168 : 128) + Math.sin(time * 3.2) * 8;
         carveRadial(o.x, o.y, orbRad, 1.0);
       }
 
-      // Crystals, Bio-Mushrooms, Bio-Vats & Shards carve
       for (const cr of level.crystals) carveRadial(cr.x + 10, cr.y + 10, 68, 0.88);
       for (const vat of level.bioVats) carveRadial(vat.x + 10, vat.y + 16, 60, 0.84);
       for (const sh of level.shards) {
-        if (!sh.collected) carveRadial(sh.x + 6, sh.y + 7, 46, 0.8);
+        if (!sh.collected) carveRadial(sh.x + 6, sh.y + 7, level.biome === 'cryo' ? 34 : 46, 0.8);
       }
-
-      // Terminals, Drones, Pistons, Switches, Doors & Moving Machinery carve
       for (const tm of level.terminals) carveRadial(tm.x + 10, tm.y + 8, 52, 0.78);
+
       if (level.machinery) {
-        for (const g of level.machinery.gondolas) {
-          const gx = lerp(g.prevX, g.x, stateFlags.alpha) + 22;
-          const gy = lerp(g.prevY, g.y, stateFlags.alpha) - 7;
-          carveRadial(gx, gy, 78, 0.88);
+        // Cryo Sweeping Spotlights: Hard-Edged Conical Shadow Carve!
+        for (const sp of level.machinery.spotlights) {
+          const sx = (sp.x - camX) * lScaleX;
+          const sy = (sp.anchorY + 6 - camY) * lScaleY;
+          const len = 178 * lScaleX;
+          const halfSpread = 0.23;
+          lctx.fillStyle = 'rgba(0,0,0,0.92)';
+          lctx.beginPath();
+          lctx.moveTo(sx, sy);
+          lctx.lineTo(sx + Math.cos(sp.angle - halfSpread) * len, sy + Math.sin(sp.angle - halfSpread) * len);
+          lctx.lineTo(sx + Math.cos(sp.angle + halfSpread) * len, sy + Math.sin(sp.angle + halfSpread) * len);
+          lctx.closePath();
+          lctx.fill();
         }
-        for (const e of level.machinery.elevators) {
-          const ex = lerp(e.prevX, e.x, stateFlags.alpha) + 24;
-          const ey = lerp(e.prevY, e.y, stateFlags.alpha) - 6;
-          carveRadial(ex, ey, 60, 0.74);
+        // Cryo Sonar Pylons & Expanding Sonar Ring Wave Carve!
+        for (const pyObj of level.machinery.sonarPylons) {
+          carveRadial(pyObj.x + 8, pyObj.y + 6, pyObj.activeTimer > 0 ? 74 : 36, 0.92);
         }
-        for (const dr of level.machinery.drones) {
-          carveRadial(dr.x + 8, dr.y + 6, 48, 0.78);
+        for (const sw of level.machinery.sonarWaves) {
+          const sx = (sw.x - camX) * lScaleX;
+          const sy = (sw.y - camY) * lScaleY;
+          const sr = sw.r * lScaleX;
+          const fade = clamp(sw.life / sw.maxLife, 0, 1);
+          lctx.strokeStyle = `rgba(0,0,0,${fade * 0.92})`;
+          lctx.lineWidth = 34 * lScaleX;
+          lctx.beginPath();
+          lctx.arc(sx, sy, sr, 0, Math.PI * 2);
+          lctx.stroke();
         }
-        for (const sw of level.machinery.switches) {
-          carveRadial(sw.x + 8, sw.y + 6, 36, 0.72);
-        }
-        for (const d of level.machinery.blastDoors) {
-          carveRadial(d.x + 8, d.y + 24, 42, 0.68);
-        }
+
+        for (const g of level.machinery.gondolas) carveRadial(lerp(g.prevX, g.x, stateFlags.alpha) + 22, lerp(g.prevY, g.y, stateFlags.alpha) - 7, 78, 0.88);
+        for (const z of level.machinery.zipGondolas) carveRadial(lerp(z.prevX, z.x, stateFlags.alpha) + 22, lerp(z.prevY, z.y, stateFlags.alpha) - 10, 92, 0.92);
+        for (const gn of level.machinery.gantries) carveRadial(lerp(gn.prevX, gn.x, stateFlags.alpha) + 22, lerp(gn.prevY, gn.y, stateFlags.alpha), 82, 0.86);
+        for (const e of level.machinery.elevators) carveRadial(lerp(e.prevX, e.x, stateFlags.alpha) + 24, lerp(e.prevY, e.y, stateFlags.alpha) - 6, 60, 0.74);
+        for (const pod of level.machinery.bouncePods) carveRadial(pod.x + 12, pod.y + 8, 56, 0.86);
+        for (const dr of level.machinery.drones) carveRadial(dr.x + 8, dr.y + 6, 48, 0.78);
+        for (const sw of level.machinery.switches) carveRadial(sw.x + 8, sw.y + 6, 36, 0.72);
+        for (const d of level.machinery.blastDoors) carveRadial(d.x + 8, d.y + 24, 42, 0.68);
       }
 
-      // Activated conduit lights & Sector 09 Sky Breach / Hazards
       if (level.orb && level.orb.activated) {
         for (const cl of level.conduitLights) carveRadial(cl.x, cl.y - 4, 42, 0.72);
       }
-      if (level.exitGate) {
-        carveRadial(level.exitGate.cx, level.exitGate.cy, level.exitGate.activated ? 220 : 120, 0.96);
-      }
-      if (level.biome === 'sector09') {
-        carveRadial(36 * TILE_SIZE, 2 * TILE_SIZE, 150, 0.82);
+      if (level.exitGate) carveRadial(level.exitGate.cx, level.exitGate.cy, level.exitGate.activated ? 240 : 140, 0.98);
+      if (level.biome === 'sector09' || level.biome === 'amber') {
         for (const hz of level.hazards) {
-          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
-            carveRadial(hx, hz.y, 76, 0.82);
-          }
+          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) carveRadial(hx, hz.y, 76, 0.82);
         }
       } else if (level.biome === 'sector07') {
         for (const hz of level.hazards) {
-          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
-            carveRadial(hx, hz.y, 64, 0.68);
-          }
+          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) carveRadial(hx, hz.y, 64, 0.68);
         }
       }
 
       lctx.globalCompositeOperation = 'source-over';
 
-      // Composite smooth shadow mask over scene
       displayCtx.save();
       displayCtx.imageSmoothingEnabled = true;
       displayCtx.globalCompositeOperation = 'source-over';
       displayCtx.drawImage(this.lightCanvas, 0, 0, dispW, dispH);
 
-      // 2. Additive Volumetric Cones, Turbine Slicing, Bounce & Blooms
       displayCtx.globalCompositeOperation = 'lighter';
 
       const drawBloom = (wx, wy, rad, stops) => {
@@ -617,31 +712,50 @@
       const [sr, sg, sb] = pal.shaftColor;
       const turbines = level.machinery ? level.machinery.turbines : [];
 
-      // Volumetric cavern shafts modulated by rotating turbine light-slicing
-      for (const sxWorld of [180, 520, 860]) {
-        let sliceMod = 1.0;
-        for (const tb of turbines) {
-          if (Math.abs(sxWorld - (tb.x + 18)) < 90) sliceMod *= tb.lightPulse;
+      if (level.biome === 'atrium') {
+        for (const bx of level.sunbeamXs || []) {
+          const sx = (bx - camX) * sxScale;
+          const topY = -camY * syScale;
+          const beamH = level.worldH * syScale;
+          const bw = 76 * sxScale;
+          const grad = displayCtx.createLinearGradient(sx, topY, sx + 90 * sxScale, topY + beamH);
+          grad.addColorStop(0, 'rgba(255, 245, 195, 0.20)');
+          grad.addColorStop(0.55, 'rgba(255, 228, 145, 0.08)');
+          grad.addColorStop(1, 'rgba(255, 210, 110, 0.01)');
+          displayCtx.fillStyle = grad;
+          displayCtx.beginPath();
+          displayCtx.moveTo(sx - bw * 0.4, topY);
+          displayCtx.lineTo(sx + bw * 0.6, topY);
+          displayCtx.lineTo(sx + bw * 1.4, topY + beamH);
+          displayCtx.lineTo(sx + bw * 0.1, topY + beamH);
+          displayCtx.closePath();
+          displayCtx.fill();
         }
-        const sx = (sxWorld - camX) * sxScale;
-        const sy = (15 - camY) * syScale;
-        const sw = 85 * sxScale;
-        const sh = 260 * syScale;
-        const grad = displayCtx.createLinearGradient(sx, sy, sx + 45 * sxScale, sy + sh);
-        grad.addColorStop(0, `rgba(${sr}, ${sg}, ${sb}, ${0.085 * sliceMod})`);
-        grad.addColorStop(0.6, `rgba(${sr}, ${sg}, ${sb}, ${0.032 * sliceMod})`);
-        grad.addColorStop(1, `rgba(${sr}, ${sg}, ${sb}, 0)`);
-        displayCtx.fillStyle = grad;
-        displayCtx.beginPath();
-        displayCtx.moveTo(sx - sw * 0.3, sy);
-        displayCtx.lineTo(sx + sw * 0.5, sy);
-        displayCtx.lineTo(sx + sw * 1.15, sy + sh);
-        displayCtx.lineTo(sx - sw * 0.1, sy + sh);
-        displayCtx.closePath();
-        displayCtx.fill();
+      } else if (level.biome !== 'cryo') {
+        for (const sxWorld of [180, 520, 860]) {
+          let sliceMod = 1.0;
+          for (const tb of turbines) {
+            if (Math.abs(sxWorld - (tb.x + 18)) < 90) sliceMod *= tb.lightPulse;
+          }
+          const sx = (sxWorld - camX) * sxScale;
+          const sy = (15 - camY) * syScale;
+          const sw = 85 * sxScale;
+          const sh = 260 * syScale;
+          const grad = displayCtx.createLinearGradient(sx, sy, sx + 45 * sxScale, sy + sh);
+          grad.addColorStop(0, `rgba(${sr}, ${sg}, ${sb}, ${0.085 * sliceMod})`);
+          grad.addColorStop(0.6, `rgba(${sr}, ${sg}, ${sb}, ${0.032 * sliceMod})`);
+          grad.addColorStop(1, `rgba(${sr}, ${sg}, ${sb}, 0)`);
+          displayCtx.fillStyle = grad;
+          displayCtx.beginPath();
+          displayCtx.moveTo(sx - sw * 0.3, sy);
+          displayCtx.lineTo(sx + sw * 0.5, sy);
+          displayCtx.lineTo(sx + sw * 1.15, sy + sh);
+          displayCtx.lineTo(sx - sw * 0.1, sy + sh);
+          displayCtx.closePath();
+          displayCtx.fill();
+        }
       }
 
-      // Direct turbine vent slicing pulse
       for (const tb of turbines) {
         drawBloom(tb.x + 18, tb.y + 18, 52 * tb.lightPulse, [
           [0.0, `rgba(${sr}, ${sg}, ${sb}, ${0.18 * tb.lightPulse})`],
@@ -649,13 +763,62 @@
         ]);
       }
 
-      // Swinging Lamp Blooms & Tilted Volumetric Cones
+      if (level.machinery) {
+        for (const sp of level.machinery.spotlights) {
+          const sx = (sp.x - camX) * sxScale;
+          const sy = (sp.anchorY + 6 - camY) * syScale;
+          const len = 178 * sxScale;
+          const halfSpread = 0.22;
+          const tipX = sx + Math.cos(sp.angle) * len;
+          const tipY = sy + Math.sin(sp.angle) * len;
+          const cg = displayCtx.createLinearGradient(sx, sy, tipX, tipY);
+          cg.addColorStop(0.0, 'rgba(225, 240, 255, 0.30)');
+          cg.addColorStop(0.45, 'rgba(112, 92, 255, 0.14)');
+          cg.addColorStop(1.0, 'rgba(112, 92, 255, 0)');
+          displayCtx.fillStyle = cg;
+          displayCtx.beginPath();
+          displayCtx.moveTo(sx, sy);
+          displayCtx.lineTo(sx + Math.cos(sp.angle - halfSpread) * len, sy + Math.sin(sp.angle - halfSpread) * len);
+          displayCtx.lineTo(sx + Math.cos(sp.angle + halfSpread) * len, sy + Math.sin(sp.angle + halfSpread) * len);
+          displayCtx.closePath();
+          displayCtx.fill();
+        }
+
+        for (const pyObj of level.machinery.sonarPylons) {
+          const boost = pyObj.activeTimer > 0 ? 1.45 : 0.75;
+          drawBloom(pyObj.x + 8, pyObj.y + 5, 38 * boost, [
+            [0.0, `rgba(207, 232, 255, ${0.32 * boost})`],
+            [0.5, `rgba(112, 92, 255, ${0.16 * boost})`],
+            [1.0, 'rgba(112, 92, 255, 0)']
+          ]);
+        }
+
+        for (const sw of level.machinery.sonarWaves) {
+          const sx = (sw.x - camX) * sxScale;
+          const sy = (sw.y - camY) * syScale;
+          const sr = sw.r * sxScale;
+          const fade = clamp(sw.life / sw.maxLife, 0, 1);
+          displayCtx.strokeStyle = `rgba(112, 92, 255, ${fade * 0.45})`;
+          displayCtx.lineWidth = 8 * sxScale;
+          displayCtx.beginPath();
+          displayCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+          displayCtx.stroke();
+
+          displayCtx.strokeStyle = `rgba(207, 232, 255, ${fade * 0.85})`;
+          displayCtx.lineWidth = 2 * sxScale;
+          displayCtx.beginPath();
+          displayCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+          displayCtx.stroke();
+        }
+      }
+
       const [lr, lg, lb] = pal.lampGlow;
+      const isCryo = level.biome === 'cryo';
       level.lamps.forEach((lamp, i) => {
         const flk = lampFlickers[i];
         const bx = lamp.x + 10;
         const by = lamp.y + 15;
-        drawBloom(bx, by, 76 * flk, [
+        drawBloom(bx, by, (isCryo ? 52 : 76) * flk, [
           [0.0, `rgba(255, 235, 200, ${0.24 * flk})`],
           [0.32, `rgba(${lr}, ${lg}, ${lb}, ${0.22 * flk})`],
           [1.0, `rgba(${lr}, ${lg}, ${lb}, 0)`]
@@ -663,8 +826,8 @@
 
         const cx = (bx - camX) * sxScale;
         const cy = (by - camY) * syScale;
-        const coneH = 92 * syScale;
-        const coneW = 54 * sxScale;
+        const coneH = (isCryo ? 68 : 92) * syScale;
+        const coneW = (isCryo ? 38 : 54) * sxScale;
         const swingShift = Math.sin(lamp.angle || 0) * 32 * sxScale;
         const cg = displayCtx.createLinearGradient(cx, cy, cx + swingShift, cy + coneH);
         cg.addColorStop(0, `rgba(${lr}, ${lg}, ${lb}, ${0.18 * flk})`);
@@ -679,20 +842,20 @@
         displayCtx.closePath();
         displayCtx.fill();
 
-        drawBloom(bx + swingShift * 0.25, by + 64, 40 * flk, [
+        drawBloom(bx + swingShift * 0.25, by + (isCryo ? 46 : 64), 40 * flk, [
           [0.0, `rgba(${lr}, ${lg}, ${lb}, ${0.11 * flk})`],
           [1.0, `rgba(${lr}, ${lg}, ${lb}, 0)`]
         ]);
       });
 
-      // Sign Fluorescent Tube Glows
       level.signs.forEach((sign, i) => {
         const flk = signFlickers[i];
-        const isBio = sign.type === 'biolab';
-        const isAmber = sign.type === 'reactor';
-        const r = isBio ? 77 : 255;
-        const g = isBio ? 255 : (isAmber ? 170 : 102);
-        const b = isBio ? 219 : (isAmber ? 51 : 217);
+        let r = 255, g = 102, b = 217;
+        if (sign.type === 'biolab') { r = 77; g = 255; b = 219; }
+        else if (sign.type === 'cryo') { r = 112; g = 92; b = 255; }
+        else if (sign.type === 'amber' || sign.type === 'reactor' || sign.type === 'viaduct') { r = 255; g = 185; b = 75; }
+        else if (sign.type === 'atrium') { r = 217; g = 247; b = 122; }
+
         for (const tb of sign.sprite.tubeBounds) {
           const tx = sign.x + tb.x + tb.w * 0.5;
           const ty = sign.y + tb.y + 1;
@@ -704,16 +867,15 @@
         }
       });
 
-      // Energy Core Orb Halo
       if (level.orb) {
         const o = level.orb;
         const pulse = 0.85 + 0.15 * Math.sin(time * 4.2);
         const rad = (o.activated ? 132 : 92) * pulse;
-        const isBio = level.biome === 'sector07';
-        const isAmb = level.biome === 'sector09';
-        const r = isBio ? 65 : 255;
-        const g = isBio ? 255 : (isAmb ? 185 : 102);
-        const b = isBio ? 220 : (isAmb ? 65 : 217);
+        let r = 255, g = 102, b = 217;
+        if (level.biome === 'sector07') { r = 65; g = 255; b = 220; }
+        else if (level.biome === 'cryo') { r = 125; g = 110; b = 255; }
+        else if (level.biome === 'amber' || level.biome === 'sector09' || level.biome === 'viaduct') { r = 255; g = 195; b = 90; }
+        else if (level.biome === 'atrium') { r = 217; g = 247; b = 122; }
         drawBloom(o.x, o.y, rad, [
           [0.0, 'rgba(255, 255, 255, 0.36)'],
           [0.35, `rgba(${r}, ${g}, ${b}, 0.32)`],
@@ -722,13 +884,12 @@
         ]);
       }
 
-      // Crystal, Bio-Mushroom & Bubbling Bio-Vat Floor Bounce Glows
       for (const cr of level.crystals) {
         const pulse = 0.88 + 0.12 * Math.sin(time * 2.8 + cr.x);
-        const isBio = level.biome === 'sector07';
-        const r = isBio ? 60 : 255;
-        const g = isBio ? 255 : 40;
-        const b = isBio ? 225 : 75;
+        let r = 255, g = 40, b = 75;
+        if (level.biome === 'sector07') { r = 60; g = 255; b = 225; }
+        else if (level.biome === 'amber') { r = 255; g = 185; b = 90; }
+        else if (level.biome === 'atrium') { r = 220; g = 248; b = 135; }
         drawBloom(cr.x + 11, cr.y + 14, 48 * pulse, [
           [0.0, `rgba(${r}, ${g}, ${b}, 0.28)`],
           [0.5, `rgba(${r}, ${g}, ${b}, 0.14)`],
@@ -737,16 +898,15 @@
       }
 
       for (const vat of level.bioVats) {
-        const isMagma = level.biome === 'sector09';
+        const isWarm = level.biome === 'sector09' || level.biome === 'amber';
         const pulse = 0.88 + 0.12 * Math.sin(time * 4 + vat.phase);
         drawBloom(vat.x + 10, vat.y + 18, 44 * pulse, [
-          [0.0, isMagma ? 'rgba(255, 195, 90, 0.30)' : 'rgba(110, 255, 230, 0.28)'],
-          [0.5, isMagma ? 'rgba(255, 95, 30, 0.14)' : 'rgba(35, 190, 165, 0.14)'],
+          [0.0, isWarm ? 'rgba(255, 195, 90, 0.30)' : 'rgba(110, 255, 230, 0.28)'],
+          [0.5, isWarm ? 'rgba(255, 95, 30, 0.14)' : 'rgba(35, 190, 165, 0.14)'],
           [1.0, 'rgba(0, 0, 0, 0)']
         ]);
       }
 
-      // Broken Cable Electric Arc Flash Blooms
       if (level.verlet) {
         for (const ch of level.verlet.chains) {
           if (ch.broken && ch.sparkTimer > 1.25) {
@@ -760,7 +920,6 @@
         }
       }
 
-      // Machinery Glows: Steam Vents, Gondola Lanterns, Pistons, Switches, Doors, Drones
       if (level.machinery) {
         for (const sv of level.machinery.steamVents) {
           if (sv.active) {
@@ -777,6 +936,43 @@
             [0.0, 'rgba(255, 235, 190, 0.30)'],
             [0.45, 'rgba(255, 170, 51, 0.16)'],
             [1.0, 'rgba(255, 150, 40, 0)']
+          ]);
+        }
+        for (const z of level.machinery.zipGondolas) {
+          const zx = lerp(z.prevX, z.x, stateFlags.alpha) + 22;
+          const zy = lerp(z.prevY, z.y, stateFlags.alpha) - 10;
+          drawBloom(zx, zy, 68, [
+            [0.0, 'rgba(255, 235, 190, 0.32)'],
+            [0.5, 'rgba(255, 195, 100, 0.16)'],
+            [1.0, 'rgba(255, 170, 70, 0)']
+          ]);
+        }
+        for (const gn of level.machinery.gantries) {
+          const gx = lerp(gn.prevX, gn.x, stateFlags.alpha) + 22;
+          const gy = lerp(gn.prevY, gn.y, stateFlags.alpha) - 4;
+          drawBloom(gx, gy, 44, [
+            [0.0, 'rgba(255, 240, 175, 0.22)'],
+            [1.0, 'rgba(255, 220, 120, 0)']
+          ]);
+        }
+        for (const pod of level.machinery.bouncePods) {
+          const boost = pod.squishTimer > 0 ? 1.45 : 1.0;
+          drawBloom(pod.x + 12, pod.y + 8, 42 * boost, [
+            [0.0, 'rgba(255, 225, 145, 0.30)'],
+            [0.5, 'rgba(255, 115, 105, 0.15)'],
+            [1.0, 'rgba(255, 115, 105, 0)']
+          ]);
+        }
+        for (const cr of level.machinery.centrifugeRings) {
+          drawBloom(cr.x, cr.y, 46, [
+            [0.0, 'rgba(255, 210, 125, 0.18)'],
+            [1.0, 'rgba(255, 170, 65, 0)']
+          ]);
+        }
+        for (const m of level.machinery.moths) {
+          drawBloom(m.x + 3, m.y + 2, 16, [
+            [0.0, 'rgba(255, 248, 195, 0.26)'],
+            [1.0, 'rgba(255, 240, 160, 0)']
           ]);
         }
         for (const p of level.machinery.pistons) {
@@ -806,52 +1002,52 @@
         }
       }
 
-      // Intense Liquid Upward Heat & Bioluminescent Bounce Blooms
-      for (const hz of level.hazards) {
-        const isLava = level.biome === 'sector09';
-        for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
-          drawBloom(hx, hz.y, isLava ? 82 : 64, [
-            [0.0, isLava ? 'rgba(255, 145, 45, 0.34)' : 'rgba(65, 255, 215, 0.22)'],
-            [0.55, isLava ? 'rgba(255, 65, 20, 0.14)' : 'rgba(25, 180, 155, 0.08)'],
-            [1.0, 'rgba(0, 0, 0, 0)']
-          ]);
+      if (level.biome !== 'viaduct') {
+        for (const hz of level.hazards) {
+          const isWarm = level.biome === 'sector09' || level.biome === 'amber';
+          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
+            drawBloom(hx, hz.y, isWarm ? 82 : 64, [
+              [0.0, isWarm ? 'rgba(255, 165, 65, 0.34)' : 'rgba(65, 255, 215, 0.22)'],
+              [0.55, isWarm ? 'rgba(255, 75, 25, 0.14)' : 'rgba(25, 180, 155, 0.08)'],
+              [1.0, 'rgba(0, 0, 0, 0)']
+            ]);
+          }
         }
       }
 
-      // Surface Broadcast Relay Sky Pillar Beam
       if (level.exitGate && level.exitGate.activated) {
         const ex = (level.exitGate.cx - camX) * sxScale;
         const ey = (level.exitGate.cy - camY) * syScale;
         const bg = displayCtx.createLinearGradient(ex, ey, ex, 0);
-        bg.addColorStop(0, 'rgba(255, 245, 205, 0.45)');
-        bg.addColorStop(0.5, 'rgba(120, 230, 255, 0.25)');
-        bg.addColorStop(1, 'rgba(120, 230, 255, 0.08)');
+        bg.addColorStop(0, 'rgba(255, 245, 205, 0.55)');
+        bg.addColorStop(0.5, 'rgba(160, 240, 255, 0.28)');
+        bg.addColorStop(1, 'rgba(160, 240, 255, 0.08)');
         displayCtx.fillStyle = bg;
-        displayCtx.fillRect(ex - 26 * sxScale, 0, 52 * sxScale, ey);
+        displayCtx.fillRect(ex - 28 * sxScale, 0, 56 * sxScale, ey);
       }
 
-      // Clean Soft Protective Circular Rim-Glow Around PICO
-      drawBloom(px, py, 44, [
-        [0.0, 'rgba(210, 238, 255, 0.22)'],
-        [0.55, 'rgba(120, 195, 255, 0.09)'],
+      drawBloom(px, py, isCryo ? 34 : 44, [
+        [0.0, isCryo ? 'rgba(207, 232, 255, 0.24)' : 'rgba(210, 238, 255, 0.22)'],
+        [0.55, isCryo ? 'rgba(112, 92, 255, 0.10)' : 'rgba(120, 195, 255, 0.09)'],
         [1.0, 'rgba(90, 150, 255, 0)']
       ]);
 
-      // 3. Biome Atmospheric Tint & Silky Radial Vignette
       displayCtx.globalCompositeOperation = 'source-over';
+      if (level.biome === 'viaduct' && level.machinery && level.machinery.lightningFlash > 0.01) {
+        displayCtx.fillStyle = `rgba(215, 228, 255, ${level.machinery.lightningFlash * 0.32})`;
+        displayCtx.fillRect(0, 0, dispW, dispH);
+      }
+
       displayCtx.fillStyle = pal.fogTint;
       displayCtx.fillRect(0, 0, dispW, dispH);
 
+      const vigStrength = isCryo ? 0.65 : (level.biome === 'atrium' ? 0.26 : 0.48);
       const vig = displayCtx.createRadialGradient(
-        dispW * 0.5,
-        dispH * 0.5,
-        dispH * 0.34,
-        dispW * 0.5,
-        dispH * 0.5,
-        dispW * 0.68
+        dispW * 0.5, dispH * 0.5, dispH * 0.34,
+        dispW * 0.5, dispH * 0.5, dispW * 0.68
       );
       vig.addColorStop(0, 'rgba(2, 4, 10, 0)');
-      vig.addColorStop(1, 'rgba(2, 4, 10, 0.52)');
+      vig.addColorStop(1, `rgba(2, 4, 10, ${vigStrength})`);
       displayCtx.fillStyle = vig;
       displayCtx.fillRect(0, 0, dispW, dispH);
 
@@ -922,7 +1118,8 @@
 
       if (moveDir !== 0) {
         this.vx += moveDir * accel * dt;
-        if (Math.abs(this.vx) > maxSpeed) this.vx = moveDir * maxSpeed;
+        const cap = level.biome === 'viaduct' && !this.grounded ? 158 : maxSpeed;
+        if (Math.abs(this.vx) > cap) this.vx = lerp(this.vx, moveDir * maxSpeed, dt * 6);
       } else {
         const drop = friction * dt;
         if (Math.abs(this.vx) <= drop) this.vx = 0;
@@ -1062,6 +1259,7 @@
     }
 
     resolveVertical(level, prevBottom, platforms = []) {
+      const wasRiding = this.ridingPlatformId;
       this.grounded = false;
       this.onTruss = false;
       this.onMetal = false;
@@ -1071,6 +1269,21 @@
       const rightCol = Math.floor((this.x + this.w - 1) / TILE_SIZE);
 
       if (this.vy >= 0) {
+        for (const plat of platforms) {
+          if (this.x + this.w - 1 > plat.x && this.x + 1 < plat.x + plat.w) {
+            const catchTop = Math.max(plat.prevY, plat.y) + 6;
+            const snapTol = wasRiding === plat.id ? 2 : 0.25;
+            if (prevBottom <= catchTop && this.y + this.h >= plat.y - snapTol) {
+              this.y = plat.y - this.h;
+              this.vy = 0;
+              this.grounded = true;
+              this.onMetal = true;
+              this.ridingPlatformId = plat.id;
+              return;
+            }
+          }
+        }
+
         const botRow = Math.floor((this.y + this.h) / TILE_SIZE);
         for (let c = leftCol; c <= rightCol; c++) {
           if (level.isSolidAtTile(c, botRow)) {
@@ -1086,20 +1299,6 @@
               this.vy = 0;
               this.grounded = true;
               this.onTruss = true;
-              return;
-            }
-          }
-        }
-
-        for (const plat of platforms) {
-          if (this.x + this.w - 1 > plat.x && this.x + 1 < plat.x + plat.w) {
-            const catchTop = Math.max(plat.prevY, plat.y) + 5;
-            if (prevBottom <= catchTop && this.y + this.h >= plat.y - 1) {
-              this.y = plat.y - this.h;
-              this.vy = 0;
-              this.grounded = true;
-              this.onMetal = true;
-              this.ridingPlatformId = plat.id;
               return;
             }
           }
@@ -1237,14 +1436,13 @@
   }
 
   // =========================================================================
-  // 4. MAIN GAME LOOP & STORY CAMPAIGN CONTROLLER
+  // 4. MAIN GAME LOOP & 7-CHAPTER STORY CAMPAIGN CONTROLLER
   // =========================================================================
   class Game {
     constructor() {
       this.displayCanvas = document.getElementById('displayCanvas');
       this.displayCtx = this.displayCanvas.getContext('2d');
 
-      // 482x272 margin buffer enables smooth 120Hz+ sub-pixel camera sliding
       const pix = createOffscreen(PIXEL_W + 2, PIXEL_H + 2);
       this.pixelCanvas = pix.canvas;
       this.pixelCtx = pix.ctx;
@@ -1285,7 +1483,6 @@
       this.finaleActive = false;
       this.finaleTimer = 0;
 
-      // Audio state trackers for doors, switches, broken cable zaps & liquid pops
       this._doorSliding = new Set();
       this._switchStates = new Map();
       this._cableTimers = new Map();
@@ -1309,6 +1506,8 @@
     loadSector(sectorIdx, isInitial = false) {
       this.sectorIndex = sectorIdx;
       this.level.build(sectorIdx);
+      this.camera.worldW = this.level.worldW;
+      this.camera.worldH = this.level.worldH;
       this.particles.reset(this.level.worldW, this.level.worldH, this.level.palette);
       this.audio.setBiome(this.level.biome);
 
@@ -1357,6 +1556,17 @@
             this.finaleActive = false;
           } else if (this.transitionState === 'none' && this.awakened) {
             this.triggerRespawn();
+          }
+        }
+        if (code.startsWith('Digit') || code.startsWith('Numpad')) {
+          const num = parseInt(code.slice(-1), 10);
+          if (num >= 1 && num <= 7 && this.transitionState === 'none') {
+            this.pendingSector = num - 1;
+            this.finaleActive = false;
+            this.finaleTimer = 0;
+            this.awakened = true;
+            this.transitionState = 'fadeOut';
+            this.transitionAlpha = 0;
           }
         }
       };
@@ -1415,7 +1625,7 @@
       }
 
       if (this.transitionState === 'fadeOut') {
-        this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 2.1);
+        this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 2.4);
         if (this.transitionAlpha >= 1) {
           const target = this.pendingSector !== null ? this.pendingSector : 0;
           this.loadSector(target, target === 0 && this.finaleTimer > 0);
@@ -1424,7 +1634,7 @@
           this.transitionState = 'fadeIn';
         }
       } else if (this.transitionState === 'fadeIn') {
-        this.transitionAlpha = Math.max(0, this.transitionAlpha - dt * 2.1);
+        this.transitionAlpha = Math.max(0, this.transitionAlpha - dt * 2.4);
         if (this.transitionAlpha <= 0) this.transitionState = 'none';
       } else if (this.transitionState === 'respawnOut') {
         this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 3.4);
@@ -1451,16 +1661,14 @@
         this.transitionState !== 'respawnOut' &&
         !this.finaleActive;
 
-      // 1. Update Machinery + Carry Player seamlessly
       this.machinery.update(dt, this.level, this.player, this.particles, this.audio, this.camera, () => {
         if (this.transitionState === 'none') {
-          this.pendingSector = this.sectorIndex + 1;
+          this.pendingSector = Math.min(6, this.sectorIndex + 1);
           this.transitionState = 'fadeOut';
         }
       });
       if (canControl) this.machinery.carryPlayer(this.player, this.level);
 
-      // Audio triggers for Switches & Blast Doors
       for (const sw of this.machinery.switches) {
         const was = this._switchStates.get(sw.id) || false;
         if (!was && sw.pressed) {
@@ -1476,7 +1684,6 @@
         }
       }
 
-      // 2. Player Physics
       this.player.update(dt, this.input, this.level, this.particles, this.audio, this.camera, canControl);
       this.input.jumpPressed = false;
 
@@ -1484,12 +1691,10 @@
         this.hintAlpha = Math.max(0, this.hintAlpha - dt * 0.45);
       }
 
-      // 3. Verlet Physics, Particles & Camera
-      this.verlet.update(dt, this.time, this.player);
+      this.verlet.update(dt, this.time, this.player, this.machinery.windForce);
       this.particles.update(dt, this.time, this.level, this.audio);
       this.camera.update(dt, this.player, this.finaleActive);
 
-      // Audio triggers for Electric Cable Zaps & Coolant Bubble Pops (when near camera)
       const camCx = this.camera.x + PIXEL_W * 0.5;
       const camCy = this.camera.y + PIXEL_H * 0.5;
       for (let i = 0; i < this.verlet.chains.length; i++) {
@@ -1498,14 +1703,12 @@
         const prevT = this._cableTimers.get(i) || 0;
         if (ch.sparkTimer > prevT + 0.5) {
           const tip = ch.nodes[ch.nodes.length - 1];
-          if (Math.hypot(tip.x - camCx, tip.y - camCy) < 290) {
-            this.audio.playElectricZap();
-          }
+          if (Math.hypot(tip.x - camCx, tip.y - camCy) < 290) this.audio.playElectricZap();
         }
         this._cableTimers.set(i, ch.sparkTimer);
       }
       const bCount = this.particles.liquidBubbles.length;
-      if (this.level.biome === 'sector07' && bCount < this._prevBubbleCount && Math.random() < 0.45) {
+      if ((this.level.biome === 'sector07' || this.level.biome === 'amber') && bCount < this._prevBubbleCount && Math.random() < 0.45) {
         this.audio.playBubblePop();
       }
       this._prevBubbleCount = bCount;
@@ -1513,7 +1716,6 @@
       const pcx = this.player.x + this.player.w * 0.5;
       const pcy = this.player.y + this.player.h * 0.5;
 
-      // 4. Hazard Basin Collision Check
       if (this.transitionState === 'none' && !this.finaleActive) {
         for (const hz of this.level.hazards) {
           if (pcx > hz.x && pcx < hz.x + hz.w && this.player.y + this.player.h > hz.y + 3) {
@@ -1523,25 +1725,23 @@
         }
       }
 
-      // 5. Collectible Shards
       for (const sh of this.level.shards) {
         if (sh.collected) continue;
         if (Math.hypot(pcx - (sh.x + 6), pcy - (sh.y + 7)) < 16) {
           sh.collected = true;
           this.totalShardsCollected++;
           const burstPal =
-            this.level.biome === 'sector07'
-              ? ['#4dffdb', '#ffffff', '#18b89a']
-              : this.level.biome === 'sector09'
-              ? ['#ffaa33', '#ffffff', '#ff5938']
-              : ['#ff1e42', '#ff8fa3', '#ffffff'];
+            this.level.biome === 'sector07' ? ['#4dffdb', '#ffffff', '#18b89a']
+            : this.level.biome === 'cryo' ? ['#cfe8ff', '#705cff', '#ffffff']
+            : this.level.biome === 'amber' ? ['#ffd27d', '#ff7369', '#ffffff']
+            : this.level.biome === 'atrium' ? ['#d9f77a', '#fff299', '#ffffff']
+            : ['#ffaa33', '#ff8fa3', '#ffffff'];
           this.particles.spawnCrystalBurst(sh.x + 6, sh.y + 7, burstPal);
           this.camera.shake(1.6);
           this.audio.playShardPickup(this.totalShardsCollected);
         }
       }
 
-      // 6. Interactive Lore Terminals & Checkpoint Save
       let nearestTerm = null;
       for (const tm of this.level.terminals) {
         if (Math.hypot(pcx - (tm.x + 10), pcy - (tm.y + 12)) < 28) {
@@ -1556,7 +1756,6 @@
       }
       this.activeTerminal = nearestTerm;
 
-      // 7. Sector Energy Core Activation
       const orb = this.level.orb;
       if (orb) {
         orb.pulseTimer -= dt;
@@ -1571,18 +1770,11 @@
           this.particles.spawnOrbPulse(orb.x, orb.y, true, this.level.palette.orbColor);
           this.camera.shake(3.4);
           this.audio.playOrbActivate();
-          const msg =
-            this.sectorIndex === 0
-              ? 'CORE RESTORED // EAST ELEVATOR UNLOCKED'
-              : this.sectorIndex === 1
-              ? 'HYDRO-CORE ONLINE // GEOTHERMAL LIFT READY'
-              : 'APEX CORE CHARGED // ACTIVATE RELAY SPIRE';
-          this.showBanner(msg);
+          this.showBanner(this.level.exitGate ? 'DOME CORE CHARGED // TOUCH RELAY SPIRE' : 'CORE SYNCHRONIZED // EXIT LIFT UNLOCKED');
         }
         if (orb.chargeAnim > 0) orb.chargeAnim = Math.max(0, orb.chargeAnim - dt * 0.8);
       }
 
-      // 8. Sector 09 Surface Broadcast Relay Finale
       if (this.level.exitGate && !this.finaleActive) {
         const gate = this.level.exitGate;
         if (Math.hypot(pcx - gate.cx, pcy - gate.cy) < 24) {
@@ -1592,21 +1784,21 @@
           this.finaleTimer = 0;
           this.camera.shake(3.8);
           this.audio.playSurfaceFinale();
-          this.particles.spawnOrbPulse(gate.cx, gate.cy, true, '#99f6ff');
+          this.particles.spawnOrbPulse(gate.cx, gate.cy, true, '#fff299');
           this.showBanner('SURFACE RELAY ONLINE // NETWORK RESTORED');
         }
       }
 
       if (this.finaleActive) {
         this.finaleTimer += dt;
-        if (Math.random() < dt * 14) {
+        if (Math.random() < dt * 16) {
           this.particles.spawnParticle(
-            this.level.exitGate.cx + (Math.random() - 0.5) * 40,
+            this.level.exitGate.cx + (Math.random() - 0.5) * 44,
             this.level.exitGate.cy + 10,
-            (Math.random() - 0.5) * 20,
-            -45 - Math.random() * 55,
-            0.9,
-            Math.random() < 0.5 ? '#ffffff' : '#80e5ff',
+            (Math.random() - 0.5) * 24,
+            -48 - Math.random() * 60,
+            0.95,
+            Math.random() < 0.5 ? '#ffffff' : '#fff099',
             -10,
             1
           );
@@ -1621,9 +1813,6 @@
       this.bannerTimer = 3.5;
     }
 
-    // -----------------------------------------------------------------------
-    // HYBRID PIXEL-ART + HD LIGHTING + SUB-PIXEL INTERPOLATED RENDERER
-    // -----------------------------------------------------------------------
     render(alpha) {
       const pctx = this.pixelCtx;
       const camInterpX = this.camera.getInterpX(alpha);
@@ -1639,28 +1828,26 @@
       pctx.imageSmoothingEnabled = false;
       pctx.clearRect(0, 0, PIXEL_W + 2, PIXEL_H + 2);
 
-      // LAYER 0: Abyssal Atmospheric Backdrop (or Dawn Sky during Finale)
       pctx.drawImage(bg.backdrop, 0, 0, PIXEL_W + 2, PIXEL_H + 2);
       if (this.finaleActive) {
-        const skyAlpha = clamp(this.finaleTimer / 2.4, 0, 0.92);
-        pctx.globalAlpha = skyAlpha;
+        pctx.globalAlpha = clamp(this.finaleTimer / 2.4, 0, 0.92);
         pctx.drawImage(this.assets.surfaceBackdrop, 0, 0, PIXEL_W + 2, PIXEL_H + 2);
         pctx.globalAlpha = 1;
       }
+      if (biome === 'viaduct' && this.machinery.lightningFlash > 0.05) {
+        pctx.fillStyle = `rgba(215, 228, 255, ${this.machinery.lightningFlash * 0.45})`;
+        pctx.fillRect(0, 0, PIXEL_W + 2, PIXEL_H + 2);
+      }
 
-      // LAYER 1-3: Parallax Architecture, Brick Vaults (+ blinking server LEDs) & Foliage
       this.drawTiledParallax(pctx, bg.megaArch, camInterpX * 0.15, camInterpY * 0.15);
       this.drawTiledParallax(pctx, bg.brickVault, camInterpX * 0.35, camInterpY * 0.35);
       this.drawBrickVaultBlinkLEDs(pctx, bg.brickVault, camInterpX * 0.35, camInterpY * 0.35);
       this.drawTiledParallax(pctx, bg.foliage, camInterpX * 0.7, camInterpY * 0.55);
 
-      // LAYER 4a: Anchored Wall Bulkhead Pipe Columns & Recessed Spinning Turbines
       for (const pipe of this.level.pipes) {
         const px = Math.round(pipe.x - intCamX);
         const py = Math.round(pipe.y - intCamY);
         if (px < -40 || px > PIXEL_W + 40) continue;
-
-        // Vertical riveted steel conduit column connecting floor-to-ceiling
         const topY = Math.round(pipe.anchorTopY - intCamY);
         const botY = Math.round(pipe.anchorBotY - intCamY);
         const spanH = Math.max(0, botY - topY);
@@ -1669,18 +1856,13 @@
         pctx.fillStyle = '#141e2e';
         pctx.fillRect(px + 6, topY, 6, spanH);
         pctx.fillRect(px + 17, topY, 8, spanH);
-        pctx.fillStyle = '#2d3f59';
-        pctx.fillRect(px + 7, topY, 2, spanH);
-        pctx.fillRect(px + 18, topY, 2, spanH);
         pctx.drawImage(this.assets.anchorPlate, px + 11, topY - 1);
         pctx.drawImage(this.assets.anchorPlate, px + 11, botY - 4);
-
         const pfIdx = Math.floor(this.time * 2.2 + pipe.x * 0.1) % pipe.frames.length;
         pctx.drawImage(pipe.frames[pfIdx], px, py);
       }
       this.machinery.renderBackground(pctx, intCamX, intCamY, this.assets, this.time);
 
-      // LAYER 4b: Auto-Tiled Terrain & Steel Truss Bridges
       const minCol = Math.max(0, Math.floor(intCamX / TILE_SIZE) - 1);
       const maxCol = Math.min(this.level.cols - 1, Math.ceil((intCamX + PIXEL_W + 2) / TILE_SIZE) + 1);
       const minRow = Math.max(0, Math.floor(intCamY / TILE_SIZE) - 1);
@@ -1696,7 +1878,6 @@
             const mask = this.level.masks[r][c];
             const v = this.level.variants[r][c];
             pctx.drawImage(this.assets.getStoneTile(biome, mask, v), wx - 2, wy - 6);
-
             if ((mask & 9) === 9 && !this.level.isGridSolid(c - 1, r - 1)) pctx.drawImage(corners.NW, wx, wy);
             if ((mask & 3) === 3 && !this.level.isGridSolid(c + 1, r - 1)) pctx.drawImage(corners.NE, wx + 12, wy);
             if ((mask & 6) === 6 && !this.level.isGridSolid(c + 1, r + 1)) pctx.drawImage(corners.SE, wx + 12, wy + 12);
@@ -1707,54 +1888,49 @@
         }
       }
 
-      // LAYER 4c: Anchored Props (Crates, Crystals, Bio-Vats, Terminals, Signs, Swinging Lamps)
+      if (this.machinery.sonarWaves.length > 0) {
+        this.renderCryoSonarWireframe(pctx, intCamX, intCamY, minCol, maxCol, minRow, maxRow);
+      }
+
+      for (const ic of this.level.icicles) {
+        pctx.drawImage(ic.sprite, Math.round(ic.x - intCamX), Math.round(ic.y - intCamY));
+      }
       for (const cr of this.level.crates) {
         pctx.drawImage(cr.sprite, Math.round(cr.x - intCamX), Math.round(cr.y - intCamY));
       }
-
       for (const crystal of this.level.crystals) {
         pctx.drawImage(crystal.sprite, Math.round(crystal.x - intCamX), Math.round(crystal.y - intCamY));
       }
-
       for (const vat of this.level.bioVats) {
         const fIdx = Math.floor(this.time * 5 + vat.phase) % vat.frames.length;
         pctx.drawImage(vat.frames[fIdx], Math.round(vat.x - intCamX), Math.round(vat.y - intCamY));
       }
-
       for (const tm of this.level.terminals) {
-        const tx = Math.round(tm.x - intCamX);
-        const ty = Math.round(tm.y - intCamY);
+        const tx = Math.round(tm.x - intCamX), ty = Math.round(tm.y - intCamY);
         pctx.drawImage(tm.sprite, tx, ty);
         const sr = tm.sprite.screenRect;
         const active = this.activeTerminal && this.activeTerminal.id === tm.id;
-        const flk = Math.sin(this.time * 18 + tm.x) > -0.7;
-        pctx.fillStyle = active ? '#6ee89a' : (tm.read ? '#2a8f63' : '#1b5944');
-        if (flk) {
+        if (Math.sin(this.time * 18 + tm.x) > -0.7) {
+          pctx.fillStyle = active ? '#6ee89a' : (tm.read ? '#2a8f63' : '#1b5944');
           pctx.fillRect(tx + sr.x + 1, ty + sr.y + 1, sr.w - 2, 1);
           pctx.fillRect(tx + sr.x + 1, ty + sr.y + 3, sr.w - 4, 1);
           pctx.fillRect(tx + sr.x + 1, ty + sr.y + 5, sr.w - 3, 1);
         }
       }
-
       if (this.level.exitGate) {
         const gate = this.level.exitGate;
-        const gx = Math.round(gate.x - intCamX);
-        const gy = Math.round(gate.y - intCamY);
+        const gx = Math.round(gate.x - intCamX), gy = Math.round(gate.y - intCamY);
         pctx.drawImage(gate.sprite, gx, gy);
-        const pulseCol = gate.activated ? '#ffffff' : (this.level.orb && this.level.orb.activated ? '#ffaa33' : '#7a3324');
-        pctx.fillStyle = pulseCol;
+        pctx.fillStyle = gate.activated ? '#ffffff' : (this.level.orb && this.level.orb.activated ? '#d9f77a' : '#7a3324');
         pctx.fillRect(gx + 14, gy + 20, 6, 4);
         pctx.fillRect(gx + 16, gy - 1, 2, 2);
       }
 
       for (const sign of this.level.signs) {
-        const sx = Math.round(sign.x - intCamX);
-        const sy = Math.round(sign.y - intCamY);
+        const sx = Math.round(sign.x - intCamX), sy = Math.round(sign.y - intCamY);
         if (sign.rods) {
           for (const rod of sign.rods) {
-            const rx = Math.round(rod.x - intCamX);
-            const topY = Math.round(rod.topY - intCamY);
-            const botY = Math.round(rod.botY - intCamY);
+            const rx = Math.round(rod.x - intCamX), topY = Math.round(rod.topY - intCamY), botY = Math.round(rod.botY - intCamY);
             pctx.drawImage(this.assets.anchorPlate, rx - 5, topY - 1);
             pctx.fillStyle = '#0c111a';
             pctx.fillRect(rx - 1, topY, 3, Math.max(0, botY - topY));
@@ -1763,7 +1939,6 @@
           }
         }
         pctx.drawImage(sign.sprite, sx, sy);
-
         const flk = this.lighting.getFlicker(this.time, sign.flickerSeed, true);
         for (const tb of sign.sprite.tubeBounds) {
           pctx.fillStyle = flk > 0.72 ? '#ffffff' : sign.sprite.glowColor;
@@ -1775,8 +1950,7 @@
 
       if (this.level.orb) {
         for (const cl of this.level.conduitLights) {
-          const lx = Math.round(cl.x - intCamX);
-          const ly = Math.round(cl.y - intCamY);
+          const lx = Math.round(cl.x - intCamX), ly = Math.round(cl.y - intCamY);
           pctx.fillStyle = '#182233';
           pctx.fillRect(lx - 2, ly - 3, 4, 3);
           pctx.fillStyle = this.level.orb.activated ? '#ffffff' : '#3d2147';
@@ -1784,18 +1958,13 @@
         }
       }
 
-      // Swinging Anchored Lamps (with rotated pendulum cord & lamp fixture)
       for (const lamp of this.level.lamps) {
-        const lx = Math.round(lamp.x - intCamX);
-        const ly = Math.round(lamp.y - intCamY);
-        const ax = Math.round(lamp.anchorX - intCamX);
-        const ay = Math.round(lamp.anchorY - intCamY);
-
+        const lx = Math.round(lamp.x - intCamX), ly = Math.round(lamp.y - intCamY);
+        const ax = Math.round(lamp.anchorX - intCamX), ay = Math.round(lamp.anchorY - intCamY);
         if (lamp.anchorType === 'ceiling') {
           pctx.drawImage(this.assets.anchorPlate, ax - 5, ay - 1);
           this.verlet.drawPixelLine(pctx, ax, ay + 2, lx + 10, ly + 3, '#182233', 2);
           this.verlet.drawPixelLine(pctx, ax, ay + 2, lx + 10, ly + 3, '#3c4f69', 1);
-
           pctx.save();
           pctx.translate(lx + 10, ly + 2);
           pctx.rotate(-(lamp.angle || 0));
@@ -1823,10 +1992,8 @@
         pctx.drawImage(orb.sprite, ox - 16, oy - 16);
         for (let i = 0; i < 4; i++) {
           const ang = this.time * (orb.activated ? 4.2 : 2.1) + (i * Math.PI) / 2;
-          const rx = Math.round(ox + Math.cos(ang) * 12);
-          const ry = Math.round(oy + Math.sin(ang) * 12);
           pctx.fillStyle = orb.activated ? '#99f6ff' : '#ffffff';
-          pctx.fillRect(rx, ry, 2, 2);
+          pctx.fillRect(Math.round(ox + Math.cos(ang) * 12), Math.round(oy + Math.sin(ang) * 12), 2, 2);
         }
       }
 
@@ -1834,34 +2001,17 @@
         if (sh.collected) continue;
         const bob = Math.round(Math.sin(this.time * 3.4 + sh.phase) * 2.2);
         const fIdx = Math.floor((this.time * 5 + sh.phase) % this.assets.shardFrames.length);
-        pctx.drawImage(
-          this.assets.shardFrames[fIdx],
-          Math.round(sh.x - intCamX),
-          Math.round(sh.y + bob - intCamY)
-        );
+        pctx.drawImage(this.assets.shardFrames[fIdx], Math.round(sh.x - intCamX), Math.round(sh.y + bob - intCamY));
       }
 
-      // LAYER 4d: Moving Machinery (Elevators, Pulleys, Counterweights, Gondolas, Pistons, Doors, Switches, Drones)
       this.machinery.renderForeground(pctx, intCamX, intCamY, this.assets, this.time, alpha);
-
-      // LAYER 4e: Multi-Layered Animated Liquid Basins & Real-Time Reflections
       this.renderPuddlesAndReflections(pctx, intCamX, intCamY, alpha);
-
-      // LAYER 4f: Verlet Chains, Broken Sparking Cables & Interactive Grass/Spore Blades
-      this.verlet.render(pctx, intCamX, intCamY, this.assets, biome);
-
-      // LAYER 4g: Protagonist UNIT-04 "PICO"
+      if (biome === 'viaduct') this.renderViaductGorgeMist(pctx, intCamX, intCamY);
+      this.verlet.render(pctx, intCamX, intCamY, this.assets, biome, this.player, this.machinery);
       this.player.render(pctx, intCamX, intCamY, alpha, this.awakened, this.wakeTimer);
-
-      // LAYER 5: Atmospheric Particles
       this.particles.render(pctx, intCamX, intCamY, this.time, this.level);
-
-      // World Tooltips
       this.renderWorldTooltips(pctx, intCamX, intCamY);
 
-      // ---------------------------------------------------------------------
-      // COMPOSITE PIXEL BUFFER -> HD DISPLAY CANVAS (SUB-PIXEL SMOOTHNESS!)
-      // ---------------------------------------------------------------------
       const dctx = this.displayCtx;
       const dispW = this.displayCanvas.width;
       const dispH = this.displayCanvas.height;
@@ -1878,7 +2028,6 @@
         (PIXEL_H + 2) * syScale
       );
 
-      // LAYER 6: Smooth HD Lighting, Turbine Slicing, Swinging Cones & Vignette
       this.lighting.render(
         dctx,
         dispW,
@@ -1888,36 +2037,73 @@
         this.time,
         this.level,
         this.player,
-        {
-          x: lerp(this.player.prevX, this.player.x, alpha),
-          y: lerp(this.player.prevY, this.player.y, alpha)
-        },
-        {
-          alpha,
-          awakened: this.awakened,
-          finaleActive: this.finaleActive
-        }
+        { x: lerp(this.player.prevX, this.player.x, alpha), y: lerp(this.player.prevY, this.player.y, alpha) },
+        { alpha, awakened: this.awakened, finaleActive: this.finaleActive }
       );
 
-      // LAYER 7: Blurred Foreground Depth-of-Field Framing (1.3x Parallax)
-      this.renderBlurredForeground(dctx, dispW, dispH, camInterpX, camInterpY);
-
-      // Minimalist HUD & Overlays
+      if (biome !== 'viaduct' && biome !== 'atrium') {
+        this.renderBlurredForeground(dctx, dispW, dispH, camInterpX, camInterpY);
+      }
       this.renderHUDAndOverlays(dctx, dispW, dispH);
     }
 
+    renderCryoSonarWireframe(ctx, intCamX, intCamY, minCol, maxCol, minRow, maxRow) {
+      for (const sw of this.machinery.sonarWaves) {
+        const fade = clamp(sw.life / sw.maxLife, 0, 1);
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            const cell = this.level.grid[r][c];
+            if (cell !== '#' && cell !== 'T') continue;
+            const cx = c * TILE_SIZE + 8;
+            const cy = r * TILE_SIZE + 8;
+            const dist = Math.hypot(cx - sw.x, cy - sw.y);
+            const band = 1 - Math.abs(dist - sw.r) / 42;
+            if (band <= 0) continue;
+
+            const wx = c * TILE_SIZE - intCamX;
+            const wy = r * TILE_SIZE - intCamY;
+            ctx.globalAlpha = band * fade * 0.92;
+            if (cell === 'T') {
+              ctx.fillStyle = '#cfe8ff';
+              ctx.fillRect(wx, wy, 16, 1);
+              ctx.fillStyle = '#705cff';
+              ctx.fillRect(wx, wy + 13, 16, 1);
+            } else {
+              const m = this.level.masks[r][c];
+              ctx.fillStyle = '#cfe8ff';
+              if ((m & 1) === 0) ctx.fillRect(wx, wy, 16, 1);
+              if ((m & 4) === 0) ctx.fillRect(wx, wy + 15, 16, 1);
+              ctx.fillStyle = '#705cff';
+              if ((m & 8) === 0) ctx.fillRect(wx, wy, 1, 16);
+              if ((m & 2) === 0) ctx.fillRect(wx + 15, wy, 1, 16);
+            }
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    renderViaductGorgeMist(ctx, intCamX, intCamY) {
+      const baseY = Math.round(37 * TILE_SIZE - intCamY);
+      if (baseY > PIXEL_H + 10) return;
+      ctx.fillStyle = 'rgba(143, 161, 199, 0.24)';
+      for (let x = -24; x < PIXEL_W + 40; x += 28) {
+        const drift = ((x - Math.floor(intCamX * 0.6 + this.time * 18)) % (PIXEL_W + 64) + (PIXEL_W + 64)) % (PIXEL_W + 64) - 32;
+        const h = 18 + Math.round(Math.sin(x * 0.2 + this.time) * 6);
+        ctx.fillRect(drift, baseY + (20 - h), 36, 48);
+      }
+    }
+
     drawBrickVaultBlinkLEDs(ctx, brickVault, ox, oy) {
-      if (!brickVault.leds) return;
-      const w = brickVault.width;
-      const h = brickVault.height;
+      if (!brickVault.leds || brickVault.leds.length === 0) return;
+      const w = brickVault.width, h = brickVault.height;
       const startX = -((Math.floor(ox) % w + w) % w);
       const startY = -((Math.floor(oy) % h + h) % h);
       for (let y = startY; y < PIXEL_H + 2; y += h) {
         for (let x = startX; x < PIXEL_W + 2; x += w) {
           for (const led of brickVault.leds) {
             const on = Math.sin(this.time * 3.8 + led.phase) > -0.15;
-            const lx = x + led.x;
-            const ly = y + led.y;
+            const lx = x + led.x, ly = y + led.y;
             if (lx < 0 || lx > PIXEL_W + 2 || ly < 0 || ly > PIXEL_H + 2) continue;
             ctx.fillStyle = on ? led.color : '#070b14';
             ctx.fillRect(lx, ly, 1, 1);
@@ -1926,9 +2112,6 @@
       }
     }
 
-    // -----------------------------------------------------------------------
-    // OVERHAULED MULTI-LAYERED ANIMATED LIQUIDS & REAL-TIME REFLECTIONS
-    // -----------------------------------------------------------------------
     renderPuddlesAndReflections(ctx, intCamX, intCamY, alpha) {
       const biome = this.level.biome;
       const prx = lerp(this.player.prevX, this.player.x, alpha);
@@ -1945,77 +2128,61 @@
         ctx.clip();
 
         if (biome === 'sector04') {
-          // 1. Sector 04 Deep Sapphire Water Depth Gradient
           const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
           grad.addColorStop(0, 'rgba(18, 56, 94, 0.78)');
           grad.addColorStop(0.5, 'rgba(10, 32, 62, 0.85)');
           grad.addColorStop(1, 'rgba(4, 14, 30, 0.92)');
           ctx.fillStyle = grad;
           ctx.fillRect(px, py, pd.w, pd.h);
-
-          // Drifting caustic light bands inside water
           for (let x = 0; x < pd.w; x += 6) {
             const caustic = Math.sin(this.time * 2.1 + x * 0.14);
-            if (caustic > 0.35) {
-              ctx.fillStyle = 'rgba(110, 200, 245, 0.16)';
-              ctx.fillRect(px + x, py + 2, 4, 1);
-            }
-            if (caustic < -0.45) {
-              ctx.fillStyle = 'rgba(75, 165, 220, 0.12)';
-              ctx.fillRect(px + x + 1, py + 4, 3, 1);
-            }
+            if (caustic > 0.35) { ctx.fillStyle = 'rgba(110, 200, 245, 0.16)'; ctx.fillRect(px + x, py + 2, 4, 1); }
           }
         } else if (biome === 'sector07') {
-          // 2. Sector 07 Bioluminescent Green Coolant Fluid
           const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
           grad.addColorStop(0, 'rgba(20, 118, 102, 0.82)');
           grad.addColorStop(0.55, 'rgba(9, 68, 64, 0.90)');
           grad.addColorStop(1, 'rgba(4, 28, 30, 0.95)');
           ctx.fillStyle = grad;
           ctx.fillRect(px, py, pd.w, pd.h);
-
-          // Swirling glowing chemical veins inside coolant
           for (let x = 0; x < pd.w; x += 3) {
             const wy = py + 3 + Math.round(Math.sin(this.time * 2.8 + x * 0.12) * 2.2);
             ctx.fillStyle = ((x + Math.floor(this.time * 6)) % 9 < 4) ? 'rgba(128, 255, 234, 0.36)' : 'rgba(35, 181, 155, 0.30)';
             ctx.fillRect(px + x, wy, 2, 1);
-            const wy2 = py + 6 + Math.round(Math.cos(this.time * 2.2 + x * 0.09) * 2.0);
-            ctx.fillStyle = 'rgba(77, 255, 219, 0.22)';
-            ctx.fillRect(px + x, wy2, 2, 1);
+          }
+        } else if (biome === 'amber') {
+          const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
+          grad.addColorStop(0, '#ffd27d');
+          grad.addColorStop(0.4, '#d9711c');
+          grad.addColorStop(1, '#5c1e0c');
+          ctx.fillStyle = grad;
+          ctx.fillRect(px, py, pd.w, pd.h);
+          for (let x = 0; x < pd.w; x += 8) {
+            const wy = py + 3 + Math.round(Math.sin(this.time * 1.4 + x * 0.1) * 1.6);
+            ctx.fillStyle = 'rgba(255, 242, 194, 0.42)';
+            ctx.fillRect(px + x, wy, 5, 1);
           }
         } else {
-          // 3. Sector 09 Incandescent Molten Geothermal Magma + Drifting Basalt Crust Plates
           const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
           grad.addColorStop(0, '#ffaa33');
           grad.addColorStop(0.45, '#e84e1b');
           grad.addColorStop(1, '#8c1d0c');
           ctx.fillStyle = grad;
           ctx.fillRect(px, py, pd.w, pd.h);
-
-          // Bright molten convection hotspots
           for (let x = 0; x < pd.w; x += 12) {
             const hot = Math.sin(this.time * 3.1 + x * 0.18);
-            if (hot > 0.2) {
-              ctx.fillStyle = hot > 0.72 ? '#fff5cf' : '#ffd875';
-              ctx.fillRect(px + x, py + 2, 7, 2);
-            }
+            if (hot > 0.2) { ctx.fillStyle = hot > 0.72 ? '#fff5cf' : '#ffd875'; ctx.fillRect(px + x, py + 2, 7, 2); }
           }
-
-          // Dark cooling basalt crust plates drifting slowly across molten cracks
           const drift = this.time * 6.5;
           for (let i = 0; i < pd.w; i += 24) {
             const plateX = px + Math.round(((i + drift) % (pd.w + 20)) - 10);
             const plateW = 12 + (i % 7);
-            ctx.fillStyle = '#1f0b0a';
-            ctx.fillRect(plateX, py + 1, plateW, 4);
-            ctx.fillStyle = '#3b1511';
-            ctx.fillRect(plateX + 1, py + 1, plateW - 2, 2);
-            ctx.fillStyle = '#732919';
-            ctx.fillRect(plateX + 2, py + 1, plateW - 4, 1);
+            ctx.fillStyle = '#1f0b0a'; ctx.fillRect(plateX, py + 1, plateW, 4);
+            ctx.fillStyle = '#3b1511'; ctx.fillRect(plateX + 1, py + 1, plateW - 2, 2);
+            ctx.fillStyle = '#732919'; ctx.fillRect(plateX + 2, py + 1, plateW - 4, 1);
           }
         }
 
-        // Wave-Distorted Inverted Real-Time Reflections (Water & Coolant)
         if (biome !== 'sector09') {
           ctx.globalAlpha = biome === 'sector07' ? 0.34 : 0.40;
           for (const cr of this.level.crystals) {
@@ -2023,48 +2190,18 @@
             if (cx >= pd.x - 16 && cx <= pd.x + pd.w + 16 && Math.abs(cr.y + cr.sprite.height - pd.y) < 58) {
               const wave = Math.round(Math.sin(this.time * 4.2 + cr.x) * 1.4);
               ctx.save();
-              ctx.translate(
-                Math.round(cr.x - intCamX + wave),
-                Math.round(2 * pd.y - (cr.y + cr.sprite.height) - intCamY + cr.sprite.height)
-              );
+              ctx.translate(Math.round(cr.x - intCamX + wave), Math.round(2 * pd.y - (cr.y + cr.sprite.height) - intCamY + cr.sprite.height));
               ctx.scale(1, -1);
               ctx.drawImage(cr.sprite, 0, 0);
               ctx.restore();
             }
           }
-
-          for (const lamp of this.level.lamps) {
-            const lx = lamp.x + 10;
-            if (lx >= pd.x - 18 && lx <= pd.x + pd.w + 18 && Math.abs(lamp.y - pd.y) < 110) {
-              const rx = Math.round(lx - intCamX + Math.sin(this.time * 5.2 + lx) * 1.5);
-              ctx.fillStyle = biome === 'sector07' ? '#4dffdb' : '#ff595e';
-              ctx.fillRect(rx - 2, py + 1, 5, 4);
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(rx - 1, py + 2, 3, 2);
-            }
-          }
-
-          if (this.level.machinery) {
-            for (const g of this.level.machinery.gondolas) {
-              const gx = lerp(g.prevX, g.x, alpha) + 22;
-              if (gx >= pd.x - 20 && gx <= pd.x + pd.w + 20) {
-                const rx = Math.round(gx - intCamX + Math.sin(this.time * 5.1) * 1.6);
-                ctx.fillStyle = '#ffaa33';
-                ctx.fillRect(rx - 2, py + 1, 5, 4);
-                ctx.fillStyle = '#fff3d6';
-                ctx.fillRect(rx - 1, py + 2, 3, 2);
-              }
-            }
-          }
-
           if (prx + 12 >= pd.x - 8 && prx <= pd.x + pd.w + 8 && Math.abs(pry + 18 - pd.y) < 40) {
             const frame = this.player.getRenderFrame(this.awakened);
             const distFromSurface = Math.max(0, pd.y - (pry + 18));
             const wave = Math.round(Math.sin(this.time * 6.5) * 1.5);
-            const refFootX = Math.round(prx + 6 - intCamX + wave);
-            const refFootY = Math.round(py + distFromSurface);
             ctx.save();
-            ctx.translate(refFootX, refFootY);
+            ctx.translate(Math.round(prx + 6 - intCamX + wave), Math.round(py + distFromSurface));
             ctx.scale(this.player.facing, -1);
             ctx.drawImage(frame, -12, -22);
             ctx.restore();
@@ -2072,22 +2209,14 @@
           ctx.globalAlpha = 1;
         }
 
-        // Animated Sine-Wave Top Meniscus & Foam Crest
         for (let x = 0; x < pd.w; x++) {
           const waveY = py + Math.round(Math.sin(this.time * 3.4 + x * 0.22) * 0.65);
-          if (biome === 'sector04') {
-            const crest = Math.sin(this.time * 2.8 + x * 0.35) > 0.3;
-            ctx.fillStyle = crest ? '#8ee0ff' : '#3578ad';
-            ctx.fillRect(px + x, waveY, 1, 1);
-          } else if (biome === 'sector07') {
-            const foam = Math.sin(this.time * 3.8 + x * 0.42) > 0.15;
-            ctx.fillStyle = foam ? '#e0fff9' : '#4dffdb';
-            ctx.fillRect(px + x, waveY, 1, 1);
-          } else {
-            const crustEdge = Math.sin(this.time * 3.2 + x * 0.3) > 0.1;
-            ctx.fillStyle = crustEdge ? '#fff5cf' : '#ffaa33';
-            ctx.fillRect(px + x, waveY, 1, 1);
-          }
+          ctx.fillStyle =
+            biome === 'sector04' ? (Math.sin(this.time * 2.8 + x * 0.35) > 0.3 ? '#8ee0ff' : '#3578ad')
+            : biome === 'sector07' ? (Math.sin(this.time * 3.8 + x * 0.42) > 0.15 ? '#e0fff9' : '#4dffdb')
+            : biome === 'amber' ? '#fff2c2'
+            : (Math.sin(this.time * 3.2 + x * 0.3) > 0.1 ? '#fff5cf' : '#ffaa33');
+          ctx.fillRect(px + x, waveY, 1, 1);
         }
 
         ctx.restore();
@@ -2136,24 +2265,17 @@
     }
 
     drawTiledParallax(ctx, img, ox, oy) {
-      const w = img.width;
-      const h = img.height;
+      const w = img.width, h = img.height;
       const startX = -((Math.floor(ox) % w + w) % w);
       const startY = -((Math.floor(oy) % h + h) % h);
       for (let y = startY; y < PIXEL_H + 2; y += h) {
-        for (let x = startX; x < PIXEL_W + 2; x += w) {
-          ctx.drawImage(img, x, y);
-        }
+        for (let x = startX; x < PIXEL_W + 2; x += w) ctx.drawImage(img, x, y);
       }
     }
 
     renderBlurredForeground(dctx, dispW, dispH, camX, camY) {
-      const sxScale = dispW / PIXEL_W;
-      const syScale = dispH / PIXEL_H;
-      const pad = 14;
-      const fgX = camX * 1.3;
-      const fgY = camY * 1.3;
-
+      const sxScale = dispW / PIXEL_W, syScale = dispH / PIXEL_H;
+      const pad = 14, fgX = camX * 1.3, fgY = camY * 1.3;
       dctx.save();
       dctx.imageSmoothingEnabled = true;
 
@@ -2161,26 +2283,14 @@
       const startTop = -((Math.floor(fgX) % (topW * 2) + topW * 2) % (topW * 2));
       for (let idx = 0, x = startTop; x < PIXEL_W + topW; x += topW, idx++) {
         const chunk = this.assets.dofTopChunks[idx % this.assets.dofTopChunks.length];
-        dctx.drawImage(
-          chunk,
-          (x - pad) * sxScale,
-          (-pad - (fgY % 12) * 0.25) * syScale,
-          chunk.width * sxScale,
-          chunk.height * syScale
-        );
+        dctx.drawImage(chunk, (x - pad) * sxScale, (-pad - (fgY % 12) * 0.25) * syScale, chunk.width * sxScale, chunk.height * syScale);
       }
 
       const botW = 260;
       const startBot = -((Math.floor(fgX + 90) % (botW * 2) + botW * 2) % (botW * 2));
       for (let idx = 0, x = startBot; x < PIXEL_W + botW; x += botW, idx++) {
         const chunk = this.assets.dofBottomChunks[idx % this.assets.dofBottomChunks.length];
-        dctx.drawImage(
-          chunk,
-          (x - pad) * sxScale,
-          (PIXEL_H - 36 - pad) * syScale,
-          chunk.width * sxScale,
-          chunk.height * syScale
-        );
+        dctx.drawImage(chunk, (x - pad) * sxScale, (PIXEL_H - 36 - pad) * syScale, chunk.width * sxScale, chunk.height * syScale);
       }
 
       const spire = this.assets.dofSideSpire;
@@ -2201,28 +2311,28 @@
       dctx.imageSmoothingEnabled = false;
       dctx.scale(scale, scale);
 
-      const secTitle = `SEC-0${this.sectorIndex === 0 ? '4' : this.sectorIndex === 1 ? '7' : '9'}`;
-      drawPixelText(dctx, secTitle, 8, 8, 'rgba(200, 225, 250, 0.58)', '#030408');
-      drawPixelText(dctx, this.audio.muted ? 'M:OFF' : 'M:SFX', 42, 8, 'rgba(180, 205, 235, 0.38)');
+      const secCode = this.level.palette.code || `CH-0${this.sectorIndex + 1}`;
+      drawPixelText(dctx, `${this.sectorIndex + 1}/7 ${secCode}`, 8, 8, 'rgba(210, 230, 252, 0.72)', '#030408');
+      drawPixelText(dctx, `[1-7] WARP  ${this.audio.muted ? 'M:OFF' : 'M:SFX'}`, 62, 8, 'rgba(180, 205, 235, 0.44)');
 
-      const hudX = PIXEL_W - 64;
+      const hudX = PIXEL_W - 66;
       const hudY = 8;
       dctx.fillStyle = 'rgba(6, 10, 20, 0.55)';
-      dctx.fillRect(hudX - 4, hudY - 3, 60, 12);
+      dctx.fillRect(hudX - 4, hudY - 3, 62, 12);
       dctx.drawImage(this.assets.shardFrames[0], hudX - 2, hudY - 4, 9, 10);
-      drawPixelText(dctx, `${this.totalShardsCollected}/15`, hudX + 9, hudY + 1, '#eef4ff', '#030408');
+      drawPixelText(dctx, `${this.totalShardsCollected}/35`, hudX + 9, hudY + 1, '#eef4ff', '#030408');
 
       const orbOn = this.level.orb && this.level.orb.activated;
       dctx.fillStyle = orbOn ? this.level.palette.orbColor : '#3a4a63';
-      dctx.fillRect(hudX + 41, hudY + 1, 5, 5);
+      dctx.fillRect(hudX + 43, hudY + 1, 5, 5);
       if (orbOn) {
         dctx.fillStyle = '#ffffff';
-        dctx.fillRect(hudX + 42, hudY + 2, 3, 3);
+        dctx.fillRect(hudX + 44, hudY + 2, 3, 3);
       }
 
       if (this.hintAlpha > 0.02 && this.awakened) {
         dctx.globalAlpha = this.hintAlpha * 0.85;
-        const hint = 'WASD / ARROWS MOVE • SPACE JUMP • S DROP • R CHECKPOINT';
+        const hint = 'WASD / ARROWS MOVE • SPACE JUMP • S DROP • 1-7 CHAPTERS';
         const hw = measurePixelText(hint) + 10;
         const hx = Math.round((PIXEL_W - hw) * 0.5);
         const hy = PIXEL_H - 22;
@@ -2253,24 +2363,24 @@
         const secs = String(Math.floor(this.runTime % 60)).padStart(2, '0');
         const rows = [
           'SURFACE RELAY ONLINE',
-          'ALL SECTORS SYNCHRONIZED',
-          `SHARDS RECOVERED: ${this.totalShardsCollected} / 15`,
-          `DATA LOGS DECODED: ${this.totalLogsRead.size} / 6`,
+          'ALL 7 CHAPTERS SYNCHRONIZED',
+          `SHARDS RECOVERED: ${this.totalShardsCollected} / 35`,
+          `DATA LOGS DECODED: ${this.totalLogsRead.size} / 14`,
           `ASCENT TIME: ${mins}:${secs}`,
           '[R] REPLAY CAMPAIGN'
         ];
-        const cardW = 166;
+        const cardW = 172;
         const cardH = 74;
         const cx = Math.round((PIXEL_W - cardW) * 0.5);
         const cy = 42;
         dctx.fillStyle = 'rgba(4, 9, 20, 0.88)';
         dctx.fillRect(cx, cy, cardW, cardH);
-        dctx.fillStyle = '#99f6ff';
+        dctx.fillStyle = '#d9f77a';
         dctx.fillRect(cx, cy, cardW, 1);
         dctx.fillRect(cx, cy + cardH - 1, cardW, 1);
 
         drawPixelText(dctx, rows[0], cx + Math.round((cardW - measurePixelText(rows[0])) * 0.5), cy + 7, '#ffffff', '#030408');
-        drawPixelText(dctx, rows[1], cx + Math.round((cardW - measurePixelText(rows[1])) * 0.5), cy + 16, '#99f6ff', '#030408');
+        drawPixelText(dctx, rows[1], cx + Math.round((cardW - measurePixelText(rows[1])) * 0.5), cy + 16, '#d9f77a', '#030408');
         drawPixelText(dctx, rows[2], cx + 14, cy + 29, '#ff8fa3', '#030408');
         drawPixelText(dctx, rows[3], cx + 14, cy + 38, '#6ee89a', '#030408');
         drawPixelText(dctx, rows[4], cx + 14, cy + 47, '#ffe38f', '#030408');
@@ -2291,6 +2401,7 @@
     }
 
     loop(now) {
+      if (window.__halted) return;
       const frameDt = Math.min(0.05, Math.max(0, (now - this.lastTime) / 1000));
       this.lastTime = now;
       this.accumulator += frameDt;
@@ -2306,5 +2417,13 @@
     }
   }
 
-  new Game();
+  try {
+    new Game();
+  } catch (err) {
+    console.error(err);
+    showCanvasError((err && err.stack) ? err.stack.split('\n')[0] : String(err));
+  }
 })();
+</script>
+</body>
+</html>
