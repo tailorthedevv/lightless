@@ -245,6 +245,7 @@
       pipeColor: '#1a3057',
       pipeHi: '#254275',
       vineCols: ['#0b2121', '#10302c', '#153d35'],
+      ledCols: ['#ff3b4d', '#6ee89a', '#8ec5ff'],
       stone: {
         core: '#030408',
         dark: '#0a101c',
@@ -296,6 +297,7 @@
       pipeColor: '#1f4f54',
       pipeHi: '#3d7d7d',
       vineCols: ['#0a2e30', '#114747', '#1f7a73'],
+      ledCols: ['#4dffdb', '#b8ff9e', '#ffaa33'],
       stone: {
         core: '#030408',
         dark: '#08171c',
@@ -347,6 +349,7 @@
       pipeColor: '#3d1d1a',
       pipeHi: '#6b3629',
       vineCols: ['#170b0d', '#261315', '#3b211e'],
+      ledCols: ['#ffaa33', '#ff3b4d', '#ffd875'],
       stone: {
         core: '#030408',
         dark: '#14090b',
@@ -391,13 +394,13 @@
   class AssetFactory {
     constructor() {
       this.tileVariants = 4;
-      this.bgLayers = {};      // biome -> { backdrop, megaArch, brickVault, foliage }
+      this.bgLayers = {};
       this.surfaceBackdrop = null;
-      this.stoneTiles = {};    // biome -> [16][4] 20x28 canvases
-      this.trussTiles = {};    // biome -> [4] 16x16 canvases
-      this.cornerDots = {};    // biome -> { NW, NE, SE, SW }
-      this.robotFrames = {};   // sleep, idle[4], run[6], jump[1], fall[1]
-      this.signs = {};         // subway, tunnel, biolab, reactor
+      this.stoneTiles = {};
+      this.trussTiles = {};
+      this.cornerDots = {};
+      this.robotFrames = {};
+      this.signs = {};
       this.cageLamp = null;
       this.bioLamp = null;
       this.amberLamp = null;
@@ -415,7 +418,16 @@
       this.terminalSprite = null;
       this.exitGateSprite = null;
 
-      // Machinery sprites
+      // Animated & Upgraded Forgotten Facility Props
+      this.bioVatFrames = [];
+      this.magmaVatFrames = [];
+      this.pistonBase = null;
+      this.pistonHead = null;
+      this.switchFrames = [];
+      this.blastDoor = null;
+      this.droneFrames = [];
+
+      // Moving Machinery Sprites
       this.elevatorCage = null;
       this.pulleyWheelFrames = [];
       this.counterweight = null;
@@ -424,7 +436,7 @@
       this.turbineFrames = [];
       this.steamValve = null;
 
-      // Blurred DOF framing
+      // Blurred Foreground DOF
       this.dofTopChunks = [];
       this.dofBottomChunks = [];
       this.dofSideSpire = null;
@@ -448,6 +460,7 @@
       this.bakeCrates();
       this.bakePipeFixtures();
       this.bakeTerminalAndExitGate();
+      this.bakeUpgradedPropsAndDrones();
       this.bakeMachinerySprites();
       this.bakeBlurredForegroundDOF();
     }
@@ -517,7 +530,6 @@
       ]);
       ctx.drawImage(base, 0, 0);
 
-      // Crisp pixel stars in upper night sky
       const rng = new SeededRNG(2099);
       for (let i = 0; i < 65; i++) {
         const sx = rng.int(4, GAME.PIXEL_W - 4);
@@ -545,7 +557,6 @@
       }
 
       if (biome === 'sector07') {
-        // Colossal distant hydro-pump cylindrical reservoirs & diagonal braces
         for (const tx of [70, 270, 470]) {
           ctx.fillStyle = c1;
           ctx.fillRect(tx, 34, 68, 280);
@@ -557,7 +568,6 @@
           ctx.fillRect(tx - 4, 270, 76, 10);
         }
       } else if (biome === 'sector09') {
-        // Giant reactor cooling shafts & angled X-frame towers
         for (const rx of [65, 255, 445]) {
           ctx.fillStyle = c1;
           ctx.fillRect(rx, 0, 52, h);
@@ -566,14 +576,12 @@
           ctx.fillStyle = c4;
           for (let y = 20; y < h; y += 64) {
             ctx.fillRect(rx - 6, y, 64, 7);
-            // Glowing faint furnace vent slits
             ctx.fillStyle = '#5c2019';
             ctx.fillRect(rx + 14, y + 18, 24, 4);
             ctx.fillStyle = c4;
           }
         }
       } else {
-        // Sector 04 giant curved aqueduct pipes & deep arched silhouettes
         ctx.fillStyle = c1;
         ctx.fillRect(0, 88, w, 24);
         ctx.fillStyle = c3;
@@ -597,7 +605,6 @@
         }
       }
 
-      // Giant arched subterranean tunnel cutouts
       ctx.fillStyle = c2;
       for (let x = 155; x < w; x += 260) {
         for (let y = 145; y < 290; y++) {
@@ -651,7 +658,6 @@
             b = clamp(Math.round((base[2] + grain + bevel) * fogFactor), 6, 255);
           }
 
-          // Deep vaulted arch cutouts showing far Layer 1 behind
           const cellX = x % 128;
           const distCenter = Math.abs(cellX - 64);
           let alpha = 228;
@@ -671,7 +677,9 @@
       }
       ctx.putImageData(img, 0, 0);
 
-      // Vertical pipe conduits & structural steel beams
+      // Vertical pipe conduits & junction server boxes with tiny distant warning LEDs
+      const rng = new SeededRNG(177 + biome.charCodeAt(biome.length - 1));
+      const leds = [];
       for (const px of [20, 146, 276, 404]) {
         ctx.fillStyle = pal.brickMortar;
         ctx.fillRect(px - 1, 0, 12, h);
@@ -685,9 +693,29 @@
           ctx.fillStyle = pal.pipeHi;
           ctx.fillRect(px - 1, fy, 12, 3);
         }
+
+        // Distant wall junction relay boxes beside pipes with tiny indicator LEDs
+        for (let jy = 42; jy < h - 30; jy += 96) {
+          const jx = px + 14;
+          ctx.fillStyle = pal.brickMortar;
+          ctx.fillRect(jx, jy, 10, 14);
+          ctx.fillStyle = pal.pipeColor;
+          ctx.fillRect(jx + 1, jy + 1, 8, 12);
+          ctx.fillStyle = pal.pipeHi;
+          ctx.fillRect(jx + 1, jy + 1, 8, 1);
+          const ledCol = pal.ledCols[rng.int(0, pal.ledCols.length - 1)];
+          const ledX = jx + 3;
+          const ledY = jy + 5;
+          ctx.fillStyle = ledCol;
+          ctx.fillRect(ledX, ledY, 1, 1);
+          if (rng.chance(0.5)) {
+            ctx.fillRect(ledX + 3, ledY, 1, 1);
+          }
+          leds.push({ x: ledX, y: ledY, color: ledCol, phase: rng.range(0, 6.28) });
+        }
       }
 
-      // Horizontal steel girders
+      // Horizontal steel girders with distant server rack LED clusters
       for (const gy of [78, 286]) {
         ctx.fillStyle = pal.brickMortar;
         ctx.fillRect(0, gy, w, 12);
@@ -698,7 +726,20 @@
           ctx.fillStyle = pal.pipeHi;
           ctx.fillRect(rx, gy + 4, 2, 3);
         }
+        // Embedded server control strip LEDs along upper girder
+        for (let sx = 54; sx < w; sx += 128) {
+          ctx.fillStyle = pal.brickMortar;
+          ctx.fillRect(sx, gy + 3, 18, 5);
+          for (let lx = 2; lx < 16; lx += 4) {
+            const col = pal.ledCols[(sx + lx) % pal.ledCols.length];
+            ctx.fillStyle = col;
+            ctx.fillRect(sx + lx, gy + 5, 1, 1);
+            leds.push({ x: sx + lx, y: gy + 5, color: col, phase: rng.range(0, 6.28) });
+          }
+        }
       }
+
+      canvas.leds = leds;
       return canvas;
     }
 
@@ -709,7 +750,6 @@
       const [vDark, vMid, vLeaf] = pal.vineCols;
 
       if (biome !== 'sector09') {
-        // Hanging vine curtains or glowing bio-tendrils
         for (let x = 6; x < w; x += rng.int(11, 22)) {
           const len = rng.int(26, 94);
           const thickness = rng.chance(0.35) ? 2 : 1;
@@ -729,7 +769,6 @@
           }
         }
       } else {
-        // Sector 09: Hanging dark structural cables & ash-dusted vertical struts
         for (let x = 18; x < w; x += rng.int(26, 48)) {
           const len = rng.int(34, 110);
           ctx.fillStyle = vDark;
@@ -739,7 +778,6 @@
         }
       }
 
-      // Mid-depth vertical support pillars
       for (const bx of [84, 240, 396]) {
         ctx.fillStyle = pal.brickMortar;
         ctx.fillRect(bx, 0, 10, h);
@@ -752,7 +790,6 @@
         }
       }
 
-      // Sagging catenary cables
       ctx.fillStyle = pal.brickMortar;
       for (const [x0, y0, x1, y1] of [[0, 35, 190, 48], [180, 50, 390, 28], [310, 62, 480, 42]]) {
         const steps = x1 - x0;
@@ -854,7 +891,6 @@
                 color = bayerCheck(lx, ly, 0.45 - distS * 0.1) ? DARK_STONE : CORE;
               }
 
-              // Sector 09 titanium plate rivet studs near exposed metal edges
               if (biome === 'sector09' && !hasN && ly === 2 && (lx === 3 || lx === 12)) {
                 color = RIM_HIGH;
               }
@@ -864,7 +900,6 @@
             }
           }
 
-          // Top flora / bio-lichen / reactor slag ash pass
           if (!hasN) {
             const coverage = biome === 'sector09' ? 0.36 : (v === 3 ? 0.52 : 0.85);
             for (let lx = 0; lx < 16; lx++) {
@@ -896,7 +931,6 @@
             }
           }
 
-          // Underside ceiling stalactites & root/coolant tendrils
           if (!hasS) {
             for (let lx = 1; lx < 15; lx++) {
               const sNoise = hash2D(lx, 77, seed);
@@ -915,7 +949,6 @@
             }
           }
 
-          // Side moss / oxidized tufts
           if (!hasW && v % 2 === 0) {
             for (let ly = 3; ly < 12; ly++) {
               if (hash2D(0, ly, seed) < 0.24) {
@@ -939,7 +972,6 @@
       }
       this.stoneTiles[biome] = tilesByMask;
 
-      // Inner L-corner bevel stamps
       const corners = {};
       for (const cName of ['NW', 'NE', 'SE', 'SW']) {
         const { canvas, ctx } = createOffscreen(4, 4);
@@ -1052,7 +1084,6 @@
           ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
         };
 
-        // 1. Antenna stem & glowing tip
         const antX = Math.round(cx - tiltX * 0.5);
         const antTop = topY - 4 + antY;
         ctx.fillStyle = '#3a4b66';
@@ -1065,7 +1096,6 @@
           px(antX + 1, antTop, '#8ce8ff');
         }
 
-        // 2. Stubby rounded legs & boots
         const lx = Math.round(cx - 3);
         const rx = Math.round(cx + 2);
         const ly = bottom - 3 + legL;
@@ -1084,7 +1114,6 @@
         ctx.fillStyle = '#eef4ff';
         ctx.fillRect(rx, ry, 1, 1);
 
-        // 3. Cute rounded off-white chassis with 1px dark outline
         const left = Math.round(cx - bodyW / 2);
         const right = left + bodyW - 1;
         const botY = topY + bodyH - 1;
@@ -1109,11 +1138,9 @@
           }
         }
 
-        // Tiny shoulder armor stripe
         px(left + 1, topY + 6, '#587499');
         px(right - 1, topY + 6, '#587499');
 
-        // 4. Side arm nubs
         ctx.fillStyle = '#0c101a';
         ctx.fillRect(left - 2, topY + 6 + armL, 2, 4);
         ctx.fillStyle = '#9db4d4';
@@ -1124,7 +1151,6 @@
         ctx.fillStyle = '#b9cce6';
         ctx.fillRect(right + 1, topY + 7 + armR, 1, 2);
 
-        // 5. Expressive Dark Visor
         const vx = Math.round(cx - 4 + tiltX * 0.5);
         const vy = topY + 3;
         ctx.fillStyle = '#0c101a';
@@ -1163,15 +1189,12 @@
     }
 
     // -----------------------------------------------------------------------
-    // E. ANCHORED SUBWAY & FACILITY SIGNS (FLOOR, CEILING & WALL MOUNTED)
+    // E. ANCHORED SUBWAY & FACILITY SIGNS (DYNAMIC HEIGHT — ZERO OVERFLOW)
     // -----------------------------------------------------------------------
     bakeSigns() {
-      // 1. Floor-Mounted Grand Subway Sign (SECTOR 04)
       this.signs.subway = this.buildSignCanvas({
         w: 116,
-        h: 64,
         boardW: 108,
-        boardH: 38,
         boardY: 10,
         header: 'SECTOR 04',
         badgeColor: '#c24dff',
@@ -1189,12 +1212,9 @@
         seed: 707
       });
 
-      // 2. Ceiling-Suspended Directional Sign (SUB-02)
       this.signs.tunnel = this.buildSignCanvas({
         w: 76,
-        h: 38,
         boardW: 70,
-        boardH: 26,
         boardY: 10,
         header: 'SUB-02',
         badgeColor: '#c24dff',
@@ -1210,12 +1230,9 @@
         seed: 808
       });
 
-      // 3. Wall-Bracketed Bio-Pump Sign (BIO-PUMP 07)
       this.signs.biolab = this.buildSignCanvas({
         w: 98,
-        h: 44,
         boardW: 86,
-        boardH: 32,
         boardY: 10,
         header: 'BIO-PUMP 07',
         badgeColor: '#4dffdb',
@@ -1233,12 +1250,9 @@
         seed: 909
       });
 
-      // 4. Floor-Mounted Reactor Sign (CORE SHAFT 09)
       this.signs.reactor = this.buildSignCanvas({
         w: 112,
-        h: 60,
         boardW: 102,
-        boardH: 34,
         boardY: 10,
         header: 'CORE SHAFT 09',
         badgeColor: '#ffaa33',
@@ -1258,9 +1272,22 @@
 
     buildSignCanvas(cfg) {
       const {
-        w, h, boardW, boardH, boardY, header, badgeColor, badgeBg,
+        boardY = 10, header, badgeColor, badgeBg,
         glowColor, lines, twoTubes, mountType, wallSide = 'left', mossColor, seed
       } = cfg;
+
+      // Exact dynamic height & width computation — guarantees ZERO text overflow
+      const lineStep = 7;
+      const boardH = 17 + lines.length * lineStep + 4;
+      const h = boardY + boardH + (mountType === 'floor' ? 14 : 4);
+
+      let maxTextW = measurePixelText(header) + 12;
+      for (const line of lines) {
+        maxTextW = Math.max(maxTextW, measurePixelText(line.text));
+      }
+      const boardW = Math.max(cfg.boardW, maxTextW + 14);
+      const w = Math.max(cfg.w, boardW + (mountType === 'wall' ? 16 : 8));
+
       const { canvas, ctx } = createOffscreen(w, h);
       const rng = new SeededRNG(seed);
 
@@ -1271,7 +1298,7 @@
 
       const legOffsets = [];
 
-      // 1. Anchoring Hardware (Floor legs / Ceiling lugs / Wall L-brackets)
+      // 1. Anchoring Hardware
       if (mountType === 'floor') {
         const legL = bx + 14;
         const legR = bx + boardW - 18;
@@ -1283,7 +1310,6 @@
           ctx.fillRect(lx, boardY + boardH - 2, 3, h - (boardY + boardH - 2));
           ctx.fillStyle = '#5c7596';
           ctx.fillRect(lx, boardY + boardH - 2, 1, h - (boardY + boardH - 2));
-          // Bolted floor flange base plate
           ctx.fillStyle = '#141c29';
           ctx.fillRect(lx - 4, h - 3, 11, 3);
           ctx.fillStyle = '#4c6382';
@@ -1293,7 +1319,6 @@
           ctx.fillRect(lx + 4, h - 2, 1, 1);
         }
       } else if (mountType === 'ceiling') {
-        // Twin top clevis anchor lugs where suspension rods bolt onto the frame
         const lugL = bx + 12;
         const lugR = bx + boardW - 15;
         legOffsets.push(lugL + 1, lugR + 1);
@@ -1306,21 +1331,17 @@
           ctx.fillRect(lx + 1, 2, 1, 2);
         }
       } else if (mountType === 'wall') {
-        // Riveted steel L-brackets bolted into side wall
         const anchorX = wallSide === 'left' ? 0 : w - 10;
         const armX = wallSide === 'left' ? 2 : bx + boardW - 2;
         const bYs = [boardY + 6, boardY + boardH - 10];
         for (const by of bYs) {
-          // Wall mounting plate
           ctx.fillStyle = '#0c111a';
           ctx.fillRect(anchorX, by - 3, 4, 10);
           ctx.fillStyle = '#3c506b';
           ctx.fillRect(anchorX + (wallSide === 'left' ? 1 : 0), by - 2, 3, 8);
-          // Bolts
           ctx.fillStyle = '#8fa9c7';
           ctx.fillRect(anchorX + 1, by - 1, 1, 1);
           ctx.fillRect(anchorX + 1, by + 4, 1, 1);
-          // Horizontal steel bracket arm + diagonal gusset strut
           ctx.fillStyle = '#253347';
           ctx.fillRect(armX, by, 8, 3);
           ctx.fillStyle = '#5a7394';
@@ -1331,7 +1352,7 @@
         legOffsets.push(...bYs);
       }
 
-      // 2. Main Metal Sign Cabinet
+      // 2. Metal Sign Cabinet
       ctx.fillStyle = '#080c12';
       ctx.fillRect(bx - 1, boardY - 1, boardW + 2, boardH + 2);
       ctx.fillStyle = '#384c66';
@@ -1341,7 +1362,6 @@
       ctx.fillStyle = '#1b2638';
       ctx.fillRect(bx + 1, boardY + boardH - 2, boardW - 2, 2);
 
-      // Enamel dark industrial face
       ctx.fillStyle = '#101b29';
       ctx.fillRect(bx + 2, boardY + 2, boardW - 4, boardH - 4);
 
@@ -1358,7 +1378,6 @@
         }
       }
 
-      // Rust streaks & corner rivets
       const rustCols = ['#4d221d', '#6e3226', '#8a422f'];
       for (let i = 0; i < 8; i++) {
         const rx = bx + rng.int(4, boardW - 6);
@@ -1375,7 +1394,7 @@
       ctx.fillRect(bx + 3, boardY + boardH - 4, 1, 1);
       ctx.fillRect(bx + boardW - 4, boardY + boardH - 4, 1, 1);
 
-      // 3. Header Badge + Pixel Typography
+      // 3. Header Badge & Safely Padded Typography
       const badgeW = measurePixelText(header) + 6;
       ctx.fillStyle = badgeBg;
       ctx.fillRect(bx + 5, boardY + 5, badgeW, 7);
@@ -1388,14 +1407,13 @@
       ctx.fillRect(bx + 5, boardY + 13, boardW - 10, 1);
       ctx.globalAlpha = 1;
 
-      let ly = boardY + 16;
-      const lineStep = lines.length > 2 ? 6 : 7;
+      let ly = boardY + 17;
       for (const line of lines) {
         drawPixelText(ctx, line.text, bx + 6, ly, line.color, '#060a12');
         ly += lineStep;
       }
 
-      // 4. Overgrown Moss / Lichen / Ash Clinging to Cabinet Rim
+      // 4. Moss Clinging to Cabinet Rim
       for (let mx = bx + 2; mx < bx + boardW - 2; mx++) {
         if (rng.chance(0.42)) {
           ctx.fillStyle = rng.chance(0.45) ? mossColor[1] : mossColor[0];
@@ -1411,7 +1429,7 @@
         }
       }
 
-      // 5. Overhead Fluorescent Tube Fixture Hoods
+      // 5. Overhead Fluorescent Tube Fixtures
       const hoodW = twoTubes ? Math.floor(boardW * 0.35) : Math.floor(boardW * 0.54);
       const hoodPositions = twoTubes
         ? [bx + 10, bx + boardW - 10 - hoodW]
@@ -1449,13 +1467,11 @@
     bakeLampsAndBrackets() {
       const makeLamp = (shadeDark, shadeMid, shadeHi, rustCol, bulbOuter, bulbMid, bulbCore) => {
         const { canvas, ctx } = createOffscreen(20, 28);
-        // Cord & top connector collar
         ctx.fillStyle = '#1b2433';
         ctx.fillRect(8, 0, 4, 3);
         ctx.fillStyle = '#3b4e69';
         ctx.fillRect(9, 2, 2, 6);
 
-        // Dome shade
         ctx.fillStyle = '#080b12';
         ctx.fillRect(4, 7, 12, 6);
         ctx.fillStyle = shadeMid;
@@ -1467,7 +1483,6 @@
         ctx.fillStyle = rustCol;
         ctx.fillRect(12, 10, 3, 2);
 
-        // Glowing bulb
         ctx.fillStyle = bulbOuter;
         ctx.fillRect(7, 13, 6, 5);
         ctx.fillStyle = bulbMid;
@@ -1475,7 +1490,6 @@
         ctx.fillStyle = bulbCore;
         ctx.fillRect(9, 14, 2, 2);
 
-        // Protective wire cage
         ctx.fillStyle = '#18212e';
         ctx.fillRect(6, 13, 1, 6);
         ctx.fillRect(13, 13, 1, 6);
@@ -1484,14 +1498,10 @@
         return canvas;
       };
 
-      // Sector 04: Crimson/coral industrial lamp
       this.cageLamp = makeLamp('#232f42', '#33445c', '#5e7694', '#733528', '#ff3b4d', '#ff7a59', '#fff3d6');
-      // Sector 07: Oxidized copper cage + bioluminescent cyan-mint bulb
       this.bioLamp = makeLamp('#1f3836', '#2f5752', '#5ea69d', '#7d4a2b', '#18b89a', '#4dffdb', '#e6fffb');
-      // Sector 09: Heavy titanium blast cage + amber gold filament
       this.amberLamp = makeLamp('#2b1e1b', '#47312c', '#7a594d', '#9e3e24', '#e8681e', '#ffaa33', '#fff5cf');
 
-      // Bolted Ceiling Anchor Flange Plate (10x5 px)
       {
         const { canvas, ctx } = createOffscreen(10, 5);
         ctx.fillStyle = '#090d14';
@@ -1508,12 +1518,10 @@
         this.anchorPlate = canvas;
       }
 
-      // Bolted Horizontal Wall Bracket Arm (14x10 px, left & right variants)
       const makeWallArm = (fromLeft) => {
         const { canvas, ctx } = createOffscreen(14, 10);
         const plateX = fromLeft ? 0 : 10;
         const armX = fromLeft ? 3 : 1;
-        // Vertical bolted wall plate
         ctx.fillStyle = '#090d14';
         ctx.fillRect(plateX, 0, 4, 10);
         ctx.fillStyle = '#3d526b';
@@ -1521,7 +1529,6 @@
         ctx.fillStyle = '#8ea8c7';
         ctx.fillRect(plateX + 1, 2, 1, 1);
         ctx.fillRect(plateX + 1, 7, 1, 1);
-        // Horizontal cantilever arm + diagonal gusset
         ctx.fillStyle = '#182230';
         ctx.fillRect(armX, 2, 10, 3);
         ctx.fillStyle = '#5c7594';
@@ -1573,11 +1580,13 @@
     }
 
     // -----------------------------------------------------------------------
-    // H. RUBY CRYSTALS & BIOLUMINESCENT SPORE MUSHROOMS
+    // H. RUBY CRYSTALS (ENHANCED FACET BEVELS & GLINTS) & BIO-MUSHROOMS
     // -----------------------------------------------------------------------
     bakeCrystals() {
       const drawCluster = (w, h, shards, seed) => {
         const { canvas, ctx } = createOffscreen(w, h);
+        const rng = new SeededRNG(seed);
+
         for (const s of shards) {
           const { bx, by, tx, ty, halfW } = s;
           const minY = Math.min(by, ty);
@@ -1591,36 +1600,45 @@
             for (let px = x0; px <= x1; px++) {
               const side = (px - cx) / (hw || 1);
               let col = '#c91234';
-              if (t > 0.82) col = '#ffffff';
-              else if (t > 0.62 || side < -0.35) col = '#ff8fa3';
-              else if (side < 0.15) col = '#ff1e42';
-              else col = '#69091e';
+              if (px === x0 || px === x1) col = '#24040b'; // crisp dark crystal edge
+              else if (t > 0.84) col = '#ffffff';
+              else if (t > 0.65 || side < -0.35) col = '#ff8fa3';
+              else if (side < 0.12) col = '#ff1e42';
+              else if (side < 0.55) col = '#9c0c27';
+              else col = '#540615';
+              // Internal crystal refraction glint
+              if (col === '#ff1e42' && hash2D(px, py, seed) > 0.88) col = '#ffc2ce';
               ctx.fillStyle = col;
               ctx.fillRect(px, py, 1, 1);
             }
           }
         }
-        const rng = new SeededRNG(seed);
-        ctx.fillStyle = '#090e18';
-        ctx.fillRect(2, h - 3, w - 4, 3);
+
+        // Rich weathered stone & lush moss cradle at base
+        ctx.fillStyle = '#070b12';
+        ctx.fillRect(1, h - 4, w - 2, 4);
+        ctx.fillStyle = '#1b2638';
+        ctx.fillRect(2, h - 3, w - 4, 2);
         for (let x = 2; x < w - 2; x++) {
-          if (rng.chance(0.55)) {
-            ctx.fillStyle = rng.chance(0.4) ? '#38a86b' : '#1c5c46';
-            ctx.fillRect(x, h - 3, 1, 2);
+          if (rng.chance(0.65)) {
+            ctx.fillStyle = '#1c5c46';
+            ctx.fillRect(x, h - 4, 1, 2);
+            ctx.fillStyle = rng.chance(0.45) ? '#38a86b' : '#6ee89a';
+            ctx.fillRect(x, h - 5, 1, 1);
           }
         }
         return canvas;
       };
 
       this.crystals.push(drawCluster(24, 24, [
-        { bx: 7,  by: 21, tx: 4,  ty: 8,  halfW: 2.5 },
-        { bx: 17, by: 21, tx: 20, ty: 7,  halfW: 2.5 },
-        { bx: 12, by: 22, tx: 13, ty: 2,  halfW: 3.4 }
+        { bx: 7,  by: 21, tx: 4,  ty: 8,  halfW: 2.6 },
+        { bx: 17, by: 21, tx: 20, ty: 7,  halfW: 2.6 },
+        { bx: 12, by: 22, tx: 13, ty: 2,  halfW: 3.6 }
       ], 101));
 
       this.crystals.push(drawCluster(18, 20, [
-        { bx: 6,  by: 18, tx: 4,  ty: 6,  halfW: 2.4 },
-        { bx: 12, by: 18, tx: 14, ty: 3,  halfW: 3.0 }
+        { bx: 6,  by: 18, tx: 4,  ty: 6,  halfW: 2.5 },
+        { bx: 12, by: 18, tx: 14, ty: 3,  halfW: 3.2 }
       ], 202));
     }
 
@@ -1629,7 +1647,6 @@
         const { canvas, ctx } = createOffscreen(w, h);
         const rng = new SeededRNG(seed);
         for (const m of caps) {
-          // Curved translucent stalk
           for (let y = m.capY + 2; y < h - 2; y++) {
             const t = (y - m.capY) / (h - m.capY);
             const sx = Math.round(m.x + Math.sin(t * 2.2) * m.curve);
@@ -1638,14 +1655,12 @@
             ctx.fillStyle = '#52b8aa';
             ctx.fillRect(sx, y, 1, 1);
           }
-          // Glowing bioluminescent dome cap
           for (let dy = -m.rY; dy <= 1; dy++) {
             const span = Math.round(m.rX * Math.sqrt(Math.max(0, 1 - (dy / (m.rY + 0.5)) ** 2)));
             for (let dx = -span; dx <= span; dx++) {
               const px = m.x + dx;
               const py = m.capY + dy;
               if (dy === 1) {
-                // Underside glowing gills
                 ctx.fillStyle = (dx & 1) ? '#99fff0' : '#26a694';
               } else if (dy <= -m.rY + 1) {
                 ctx.fillStyle = '#e0fff9';
@@ -1657,12 +1672,10 @@
               ctx.fillRect(px, py, 1, 1);
             }
           }
-          // Tiny glowing spots on cap
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(m.x - 1, m.capY - m.rY + 1, 1, 1);
           if (m.rX >= 4) ctx.fillRect(m.x + 2, m.capY - 1, 1, 1);
         }
-        // Mossy verdigris base
         ctx.fillStyle = '#071a1c';
         ctx.fillRect(2, h - 3, w - 4, 3);
         for (let x = 2; x < w - 2; x++) {
@@ -1674,14 +1687,12 @@
         return canvas;
       };
 
-      // Variant 0: Tall triple bio-mushroom cluster (24x24)
       this.bioMushrooms.push(makeMushCluster(24, 24, [
         { x: 6,  capY: 13, rX: 4, rY: 3, curve: -1 },
         { x: 18, capY: 11, rX: 4, rY: 3, curve: 1 },
         { x: 12, capY: 6,  rX: 6, rY: 4, curve: 0.6 }
       ], 611));
 
-      // Variant 1: Compact twin bio-mushroom cluster (18x20)
       this.bioMushrooms.push(makeMushCluster(18, 20, [
         { x: 6,  capY: 11, rX: 4, rY: 3, curve: -0.8 },
         { x: 12, capY: 7,  rX: 5, rY: 4, curve: 0.8 }
@@ -1715,6 +1726,9 @@
       }
     }
 
+    // -----------------------------------------------------------------------
+    // I. WEATHERED SUPPLY CRATES & RIVETED WALL BULKHEAD PIPE COLUMNS
+    // -----------------------------------------------------------------------
     bakeCrates() {
       const makeCrate = (w, h, seed) => {
         const { canvas, ctx } = createOffscreen(w, h);
@@ -1722,45 +1736,63 @@
 
         ctx.fillStyle = '#070a10';
         ctx.fillRect(0, 1, w, h - 1);
-        ctx.fillStyle = '#243142';
-        ctx.fillRect(1, 2, w - 2, h - 3);
-        ctx.fillStyle = '#364861';
-        ctx.fillRect(1, 2, w - 2, 3);
-        ctx.fillStyle = '#5b7494';
-        ctx.fillRect(2, 2, w - 4, 1);
 
-        const bandY = Math.floor(h * 0.45);
-        for (let x = 3; x < w - 3; x++) {
-          for (let y = bandY; y < bandY + 4; y++) {
-            const stripe = ((x + y) % 6) < 3;
-            ctx.fillStyle = stripe ? '#c98f32' : '#18202c';
-            if (rng.chance(0.15)) ctx.fillStyle = '#4f2c1d';
+        // Metallic wear & bevel dithering
+        for (let y = 2; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const n = hash2D(x, y, seed);
+            let col = '#243142';
+            if (y === 2) col = '#6f8aa8';
+            else if (y <= 4) col = n > 0.35 ? '#364861' : '#2c3c52';
+            else if (x === 1 || x === w - 2) col = '#3c506b';
+            else if (y >= h - 3) col = '#141c26';
+            else if (bayerCheck(x, y, 0.25)) col = '#1c2636';
+            ctx.fillStyle = col;
             ctx.fillRect(x, y, 1, 1);
           }
         }
 
-        ctx.fillStyle = '#141c26';
+        // Diagonal industrial hazard band
+        const bandY = Math.floor(h * 0.45);
+        for (let x = 3; x < w - 3; x++) {
+          for (let y = bandY; y < bandY + 4; y++) {
+            const stripe = ((x + y) % 6) < 3;
+            ctx.fillStyle = stripe ? '#d49a2a' : '#18202c';
+            if (rng.chance(0.18)) ctx.fillStyle = '#5c2c1d';
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+
+        // Corner steel brackets & rivets
+        ctx.fillStyle = '#111824';
         ctx.fillRect(2, 5, w - 4, 1);
         ctx.fillRect(2, h - 4, w - 4, 1);
-        ctx.fillStyle = '#738fad';
+        ctx.fillStyle = '#94afc9';
         ctx.fillRect(3, 3, 1, 1);
         ctx.fillRect(w - 4, 3, 1, 1);
         ctx.fillRect(3, h - 3, 1, 1);
         ctx.fillRect(w - 4, h - 3, 1, 1);
 
+        // Rust streaks & grime
         for (let x = 2; x < w - 2; x++) {
-          if (rng.chance(0.45)) {
-            ctx.fillStyle = rng.chance(0.5) ? '#5e2c22' : '#7a3b29';
-            ctx.fillRect(x, h - rng.int(2, 4), 1, 2);
+          if (rng.chance(0.48)) {
+            const rCol = rng.chance(0.5) ? '#5e2c22' : '#85402b';
+            ctx.fillStyle = rCol;
+            ctx.fillRect(x, h - rng.int(2, 5), 1, rng.int(2, 4));
           }
         }
 
+        // Overgrown moss + hanging vine tips over lid
         for (let x = 1; x < w - 1; x++) {
-          if (rng.chance(0.58)) {
+          if (rng.chance(0.62)) {
             ctx.fillStyle = '#1c5c46';
             ctx.fillRect(x, 1, 1, 2);
             ctx.fillStyle = rng.chance(0.45) ? '#38a86b' : '#6ee89a';
             ctx.fillRect(x, 0, 1, 1);
+            if (rng.chance(0.28)) {
+              ctx.fillStyle = '#1c5c46';
+              ctx.fillRect(x, 3, 1, rng.int(1, 4));
+            }
           }
         }
         return canvas;
@@ -1771,52 +1803,110 @@
     }
 
     bakePipeFixtures() {
-      const { canvas, ctx } = createOffscreen(32, 48);
-      for (const [px, pw] of [[6, 6], [16, 8]]) {
-        ctx.fillStyle = '#090e17';
-        ctx.fillRect(px - 1, 0, pw + 2, 48);
-        ctx.fillStyle = '#1f2d42';
-        ctx.fillRect(px, 0, pw, 48);
-        ctx.fillStyle = '#3b5170';
-        ctx.fillRect(px + 1, 0, 2, 48);
-        for (const cy of [8, 30]) {
-          ctx.fillStyle = '#121a26';
-          ctx.fillRect(px - 2, cy, pw + 4, 4);
-          ctx.fillStyle = '#4e678a';
-          ctx.fillRect(px - 1, cy + 1, pw + 2, 1);
+      // 4 animated pressure-gauge variants of the 32x48 Riveted Wall Bulkhead Column
+      const needleOffsets = [
+        [-2, -1],
+        [0, -2],
+        [2, -1],
+        [1, 1]
+      ];
+      for (let f = 0; f < 4; f++) {
+        const { canvas, ctx } = createOffscreen(32, 48);
+
+        // Full riveted steel backing plate behind pipe cluster & gauges
+        ctx.fillStyle = '#070b12';
+        ctx.fillRect(1, 0, 30, 48);
+        ctx.fillStyle = '#182230';
+        ctx.fillRect(2, 1, 28, 46);
+        ctx.fillStyle = '#2c3d52';
+        ctx.fillRect(2, 1, 28, 1);
+        ctx.fillRect(2, 1, 1, 46);
+        ctx.fillStyle = '#0e1520';
+        ctx.fillRect(2, 45, 28, 2);
+
+        // Corner bolts on backing plate
+        ctx.fillStyle = '#7b94ad';
+        for (const [bx, by] of [[4, 3], [27, 3], [4, 43], [27, 43], [4, 24], [27, 24]]) {
+          ctx.fillRect(bx, by, 1, 1);
         }
+
+        // Rust stains & moss speck on top backing lip
+        ctx.fillStyle = '#5e2c22';
+        ctx.fillRect(6, 36, 3, 6);
+        ctx.fillRect(23, 8, 2, 5);
+        ctx.fillStyle = '#1c5c46';
+        ctx.fillRect(5, 0, 7, 2);
+        ctx.fillStyle = '#38a86b';
+        ctx.fillRect(7, 0, 3, 1);
+
+        // Vertical steel pipe conduits bolted onto plate
+        for (const [px, pw] of [[6, 6], [17, 8]]) {
+          ctx.fillStyle = '#090e17';
+          ctx.fillRect(px - 1, 0, pw + 2, 48);
+          ctx.fillStyle = '#24344a';
+          ctx.fillRect(px, 0, pw, 48);
+          ctx.fillStyle = '#4a6485';
+          ctx.fillRect(px + 1, 0, 2, 48);
+          for (const cy of [8, 32]) {
+            ctx.fillStyle = '#111824';
+            ctx.fillRect(px - 2, cy, pw + 4, 4);
+            ctx.fillStyle = '#5f7a9c';
+            ctx.fillRect(px - 1, cy + 1, pw + 2, 1);
+            ctx.fillStyle = '#9bb5d4';
+            ctx.fillRect(px - 1, cy + 1, 1, 1);
+            ctx.fillRect(px + pw, cy + 1, 1, 1);
+          }
+        }
+
+        // Red industrial shutoff valve wheel
+        ctx.fillStyle = '#471515';
+        ctx.fillRect(16, 16, 9, 9);
+        ctx.fillStyle = '#a8322b';
+        ctx.fillRect(17, 17, 7, 7);
+        ctx.fillStyle = '#111824';
+        ctx.fillRect(18, 18, 2, 2);
+        ctx.fillRect(21, 18, 2, 2);
+        ctx.fillRect(18, 21, 2, 2);
+        ctx.fillRect(21, 21, 2, 2);
+
+        // Analog Pressure Dial Gauge (x=4..12, y=15..23)
+        ctx.fillStyle = '#090d14';
+        ctx.fillRect(4, 15, 9, 9);
+        ctx.fillStyle = '#485f7d';
+        ctx.fillRect(5, 16, 7, 7);
+        ctx.fillStyle = '#d8e6f5';
+        ctx.fillRect(6, 17, 5, 5);
+        // Red danger tick on right edge of dial
+        ctx.fillStyle = '#ff3b4d';
+        ctx.fillRect(10, 18, 1, 2);
+        // Animated dial needle
+        const [nx, ny] = needleOffsets[f];
+        ctx.fillStyle = '#141c29';
+        ctx.fillRect(8, 19, 1, 1);
+        ctx.fillStyle = '#c92a2a';
+        ctx.fillRect(8 + nx, 19 + ny, 1, 1);
+        ctx.fillRect(8 + Math.round(nx * 0.5), 19 + Math.round(ny * 0.5), 1, 1);
+
+        this.pipeFixtures.push(canvas);
       }
-      ctx.fillStyle = '#5c1f1e';
-      ctx.fillRect(15, 16, 9, 9);
-      ctx.fillStyle = '#9e322b';
-      ctx.fillRect(16, 17, 7, 7);
-      ctx.fillStyle = '#111824';
-      ctx.fillRect(17, 18, 2, 2);
-      ctx.fillRect(20, 18, 2, 2);
-      ctx.fillRect(17, 21, 2, 2);
-      ctx.fillRect(20, 21, 2, 2);
-      this.pipeFixtures.push(canvas);
     }
 
     // -----------------------------------------------------------------------
-    // I. DATA TERMINALS & SURFACE BROADCAST GATE
+    // J. DATA TERMINALS & SURFACE BROADCAST GATE
     // -----------------------------------------------------------------------
     bakeTerminalAndExitGate() {
-      // Interactive Lore CRT Data Console (20x24 px, anchored flush on floor)
       {
         const { canvas, ctx } = createOffscreen(20, 24);
-        // Pedestal base anchored to ground
         ctx.fillStyle = '#090d14';
         ctx.fillRect(4, 15, 12, 9);
         ctx.fillStyle = '#243142';
         ctx.fillRect(5, 16, 10, 7);
         ctx.fillStyle = '#485f7d';
-        ctx.fillRect(2, 22, 16, 2); // bolted floor plate
+        ctx.fillRect(2, 22, 16, 2);
         ctx.fillStyle = '#738fad';
         ctx.fillRect(3, 22, 1, 1);
         ctx.fillRect(16, 22, 1, 1);
 
-        // Angled keyboard console lip
         ctx.fillStyle = '#182230';
         ctx.fillRect(2, 13, 16, 4);
         ctx.fillStyle = '#4c6482';
@@ -1826,7 +1916,6 @@
         ctx.fillRect(9, 14, 2, 1);
         ctx.fillRect(13, 14, 1, 1);
 
-        // CRT Monitor Housing
         ctx.fillStyle = '#080c12';
         ctx.fillRect(2, 1, 16, 13);
         ctx.fillStyle = '#334459';
@@ -1834,30 +1923,25 @@
         ctx.fillStyle = '#5c7594';
         ctx.fillRect(3, 2, 14, 1);
 
-        // Dark CRT Glass Screen
         ctx.fillStyle = '#061412';
         ctx.fillRect(4, 4, 12, 8);
         canvas.screenRect = { x: 4, y: 4, w: 12, h: 8 };
         this.terminalSprite = canvas;
       }
 
-      // Surface Broadcast Relay Beacon Gate (34x44 px)
       {
         const { canvas, ctx } = createOffscreen(34, 44);
-        // Bolted base platform
         ctx.fillStyle = '#090d14';
         ctx.fillRect(2, 36, 30, 8);
         ctx.fillStyle = '#2a394f';
         ctx.fillRect(3, 37, 28, 6);
         ctx.fillStyle = '#607a9c';
         ctx.fillRect(4, 37, 26, 1);
-        // Hazard strip along base
         for (let x = 5; x < 29; x++) {
           ctx.fillStyle = ((x >> 1) & 1) ? '#d9982b' : '#18202c';
           ctx.fillRect(x, 39, 1, 2);
         }
 
-        // Twin heavy broadcast spire pylons
         ctx.fillStyle = '#0a0f17';
         ctx.fillRect(7, 8, 20, 29);
         ctx.fillStyle = '#1d2838';
@@ -1869,13 +1953,11 @@
         ctx.fillRect(10, 10, 1, 27);
         ctx.fillRect(22, 10, 1, 27);
 
-        // Central Spire Antenna Needle
         ctx.fillStyle = '#567091';
         ctx.fillRect(16, 1, 2, 16);
         ctx.fillStyle = '#b4cee8';
         ctx.fillRect(16, 1, 1, 12);
 
-        // Dish / Emitter Ring
         ctx.fillStyle = '#121a26';
         ctx.fillRect(12, 16, 10, 12);
         ctx.fillStyle = '#4f6885';
@@ -1887,14 +1969,300 @@
     }
 
     // -----------------------------------------------------------------------
-    // J. HIGH-CRAFT MOVING MACHINERY SPRITES
+    // K. UPGRADED "FORGOTTEN" PROPS & ANIMATED SPRITE SHEETS
+    // -----------------------------------------------------------------------
+    bakeUpgradedPropsAndDrones() {
+      // 1. Animated Bubbling Bio-Tanks / Coolant Sight-Vats (4 frames, 20x34 px)
+      const makeVatFrames = (fluidDark, fluidMid, fluidTop, bubbleHi, rimMoss) => {
+        const frames = [];
+        for (let f = 0; f < 4; f++) {
+          const { canvas, ctx } = createOffscreen(20, 34);
+
+          // Top domed steel cap & vent stub
+          ctx.fillStyle = '#090d14';
+          ctx.fillRect(8, 0, 4, 3);
+          ctx.fillRect(3, 2, 14, 5);
+          ctx.fillStyle = '#334459';
+          ctx.fillRect(4, 3, 12, 3);
+          ctx.fillStyle = '#6782a6';
+          ctx.fillRect(5, 3, 10, 1);
+          ctx.fillStyle = rimMoss;
+          ctx.fillRect(5, 2, 4, 1);
+
+          // Bolted steel pedestal base (y = 27..33)
+          ctx.fillStyle = '#080b12';
+          ctx.fillRect(2, 27, 16, 7);
+          ctx.fillStyle = '#28364a';
+          ctx.fillRect(3, 28, 14, 5);
+          ctx.fillStyle = '#536c8a';
+          ctx.fillRect(3, 28, 14, 1);
+          // Bolted floor flange
+          ctx.fillStyle = '#3d516b';
+          ctx.fillRect(1, 31, 18, 3);
+          ctx.fillStyle = '#8fa9c7';
+          ctx.fillRect(2, 32, 1, 1);
+          ctx.fillRect(17, 32, 1, 1);
+          // Rust drip on base
+          ctx.fillStyle = '#6e3226';
+          ctx.fillRect(12, 29, 2, 3);
+
+          // Glass cylinder chamber (x = 4..15, y = 7..26)
+          ctx.fillStyle = '#061114';
+          ctx.fillRect(4, 7, 12, 20);
+          // Fluid fill (y = 10..26)
+          ctx.fillStyle = fluidDark;
+          ctx.fillRect(4, 10, 12, 17);
+          ctx.fillStyle = fluidMid;
+          ctx.fillRect(5, 11, 9, 15);
+          // Bright meniscus surface highlight
+          ctx.fillStyle = fluidTop;
+          ctx.fillRect(4, 10, 12, 1);
+
+          // Animated rising bubbles across 4 looping frames
+          const bubbleSpecs = [
+            { x: 7,  baseY: 24, size: 2 },
+            { x: 12, baseY: 21, size: 1 },
+            { x: 9,  baseY: 17, size: 2 },
+            { x: 13, baseY: 14, size: 1 }
+          ];
+          for (let i = 0; i < bubbleSpecs.length; i++) {
+            const b = bubbleSpecs[i];
+            const travel = (f * 3 + i * 2) % 13;
+            const by = 25 - ((25 - b.baseY + travel) % 13);
+            const wobble = ((f + i) % 2 === 0) ? 0 : 1;
+            ctx.fillStyle = bubbleHi;
+            ctx.fillRect(b.x + wobble, by, b.size, b.size);
+          }
+
+          // Vertical specular glass highlight strip + outer frame struts + center hoop
+          ctx.fillStyle = '#e0fff9';
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(5, 8, 1, 18);
+          ctx.globalAlpha = 1;
+
+          ctx.fillStyle = '#182230';
+          ctx.fillRect(3, 7, 1, 20);
+          ctx.fillRect(16, 7, 1, 20);
+          ctx.fillStyle = '#4e6785';
+          ctx.fillRect(3, 16, 14, 2);
+          ctx.fillStyle = '#8aa4c4';
+          ctx.fillRect(4, 16, 1, 1);
+          ctx.fillRect(15, 16, 1, 1);
+
+          frames.push(canvas);
+        }
+        return frames;
+      };
+
+      this.bioVatFrames = makeVatFrames('#0c4f49', '#19a892', '#80ffea', '#e6fffb', '#23b59b');
+      this.magmaVatFrames = makeVatFrames('#5e1d0e', '#cf5019', '#ffbb45', '#fff2c2', '#8c4926');
+
+      // 2. Animated Hydraulic Pumping Pistons (pistonBase + pistonHead, 22x40 px)
+      {
+        // Stationary Housing Base (22x40 px)
+        const { canvas, ctx } = createOffscreen(22, 40);
+        // Heavy bolted top & collar flange
+        ctx.fillStyle = '#080b12';
+        ctx.fillRect(1, 0, 20, 26);
+        ctx.fillStyle = '#253347';
+        ctx.fillRect(2, 1, 18, 24);
+        ctx.fillStyle = '#5c7594';
+        ctx.fillRect(2, 1, 18, 2);
+        // Side guide columns extending full 40px height
+        ctx.fillStyle = '#0b1018';
+        ctx.fillRect(1, 24, 3, 16);
+        ctx.fillRect(18, 24, 3, 16);
+        ctx.fillStyle = '#384c66';
+        ctx.fillRect(2, 24, 2, 15);
+        ctx.fillRect(18, 24, 2, 15);
+        // Recessed central piston bore slot
+        ctx.fillStyle = '#060910';
+        ctx.fillRect(8, 20, 6, 6);
+        // Hazard warning trim on housing skirt
+        for (let x = 3; x < 19; x++) {
+          ctx.fillStyle = ((x >> 1) & 1) ? '#d49a2a' : '#18202c';
+          ctx.fillRect(x, 21, 1, 3);
+        }
+        // Corner bolts & rust weathering
+        ctx.fillStyle = '#9bb5d4';
+        ctx.fillRect(3, 3, 1, 1);
+        ctx.fillRect(18, 3, 1, 1);
+        ctx.fillStyle = '#733528';
+        ctx.fillRect(14, 14, 3, 4);
+        // Glowing pressure sight-strip (x = 4..6, y = 6..18)
+        ctx.fillStyle = '#091417';
+        ctx.fillRect(4, 6, 3, 13);
+        ctx.fillStyle = '#33e6c8';
+        ctx.fillRect(5, 9, 1, 9);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(5, 9, 1, 2);
+
+        canvas.sightRect = { x: 4, y: 6, w: 3, h: 13 };
+        this.pistonBase = canvas;
+      }
+
+      {
+        // Moving Chrome Piston Rod + Armored Hammer Head (22x40 px)
+        const { canvas, ctx } = createOffscreen(22, 40);
+        // Chrome hydraulic rod
+        ctx.fillStyle = '#090d14';
+        ctx.fillRect(8, 0, 6, 29);
+        ctx.fillStyle = '#7b94ad';
+        ctx.fillRect(9, 0, 4, 29);
+        ctx.fillStyle = '#eef4ff';
+        ctx.fillRect(10, 0, 1, 29);
+
+        // Heavy armored press block at bottom (y = 28..39)
+        ctx.fillStyle = '#080b12';
+        ctx.fillRect(2, 28, 18, 12);
+        ctx.fillStyle = '#364861';
+        ctx.fillRect(3, 29, 16, 9);
+        ctx.fillStyle = '#6f8aa8';
+        ctx.fillRect(3, 29, 16, 2);
+        for (let x = 4; x < 18; x++) {
+          ctx.fillStyle = ((x >> 1) & 1) ? '#d9982b' : '#18202c';
+          ctx.fillRect(x, 34, 1, 3);
+        }
+        ctx.fillStyle = '#141c26';
+        ctx.fillRect(3, 37, 16, 2);
+        this.pistonHead = canvas;
+      }
+
+      // 3. Floor Pressure Switch / Lever Console (2 frames: unpressed/pressed, 16x10 px)
+      for (let pressed = 0; pressed < 2; pressed++) {
+        const { canvas, ctx } = createOffscreen(16, 10);
+        const padY = pressed ? 5 : 3;
+        // Bolted base plate (y = 6..9)
+        ctx.fillStyle = '#080b12';
+        ctx.fillRect(0, 6, 16, 4);
+        ctx.fillStyle = '#2a394f';
+        ctx.fillRect(1, 7, 14, 2);
+        ctx.fillStyle = '#7b94ad';
+        ctx.fillRect(1, 7, 1, 1);
+        ctx.fillRect(14, 7, 1, 1);
+
+        // Depressible steel pad
+        ctx.fillStyle = '#090d14';
+        ctx.fillRect(2, padY, 12, 4);
+        ctx.fillStyle = '#485f7d';
+        ctx.fillRect(3, padY + 1, 10, 2);
+        ctx.fillStyle = '#8aa4c7';
+        ctx.fillRect(3, padY + 1, 10, 1);
+
+        // Glowing status LED indicator
+        ctx.fillStyle = pressed ? '#6ee89a' : '#ff3b4d';
+        ctx.fillRect(7, padY + 1, 2, 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(7, padY + 1, 1, 1);
+
+        // Tiny side lever nub
+        ctx.fillStyle = '#5c7594';
+        ctx.fillRect(13, pressed ? 5 : 3, 2, 2);
+        this.switchFrames.push(canvas);
+      }
+
+      // 4. Sliding Armored Blast Door (16x48 px)
+      {
+        const { canvas, ctx } = createOffscreen(16, 48);
+        ctx.fillStyle = '#070a10';
+        ctx.fillRect(0, 0, 16, 48);
+
+        // Armored steel slab body
+        ctx.fillStyle = '#243142';
+        ctx.fillRect(1, 1, 14, 46);
+        ctx.fillStyle = '#485f7d';
+        ctx.fillRect(2, 1, 2, 46);
+        ctx.fillStyle = '#161f2d';
+        ctx.fillRect(12, 1, 3, 46);
+
+        // Top & bottom hazard bands
+        for (const hy of [3, 41]) {
+          for (let x = 2; x < 14; x++) {
+            ctx.fillStyle = ((x >> 1) & 1) ? '#d49a2a' : '#18202c';
+            ctx.fillRect(x, hy, 1, 4);
+          }
+        }
+
+        // Interlocking horizontal ribs & center lock seam
+        for (const ry of [12, 19, 28, 35]) {
+          ctx.fillStyle = '#111824';
+          ctx.fillRect(2, ry, 12, 2);
+          ctx.fillStyle = '#5f7899';
+          ctx.fillRect(2, ry, 12, 1);
+        }
+
+        // Rust & moss weathering
+        ctx.fillStyle = '#6e3226';
+        ctx.fillRect(10, 14, 3, 4);
+        ctx.fillStyle = '#1c5c46';
+        ctx.fillRect(2, 0, 5, 2);
+
+        // Dual status LED socket
+        ctx.fillStyle = '#090d14';
+        ctx.fillRect(5, 22, 6, 4);
+        ctx.fillStyle = '#ff3b4d';
+        ctx.fillRect(6, 23, 4, 2);
+        canvas.ledRect = { x: 6, y: 23, w: 4, h: 2 };
+        this.blastDoor = canvas;
+      }
+
+      // 5. Hovering Maintenance Drone (4 frames, 16x14 px)
+      const eyeXs = [6, 7, 8, 7];
+      for (let f = 0; f < 4; f++) {
+        const { canvas, ctx } = createOffscreen(16, 14);
+        const bob = (f === 1 || f === 2) ? 0 : 1;
+
+        // Top twin stabilizer antennae
+        ctx.fillStyle = '#3a4b66';
+        ctx.fillRect(4, bob, 1, 2);
+        ctx.fillRect(11, bob, 1, 2);
+        ctx.fillStyle = f % 2 === 0 ? '#6ee89a' : '#ffaa33';
+        ctx.fillRect(4, bob, 1, 1);
+
+        // Cylindrical weathered chassis (x = 3..12, y = 2+bob..9+bob)
+        ctx.fillStyle = '#090d14';
+        ctx.fillRect(2, 2 + bob, 12, 8);
+        ctx.fillStyle = '#9db4d4';
+        ctx.fillRect(3, 2 + bob, 10, 2);
+        ctx.fillStyle = '#eef4ff';
+        ctx.fillRect(4, 2 + bob, 7, 1);
+        ctx.fillStyle = '#566d8c';
+        ctx.fillRect(3, 4 + bob, 10, 5);
+        // Rust chip & hazard badge on side
+        ctx.fillStyle = '#7a3b29';
+        ctx.fillRect(11, 7 + bob, 2, 2);
+        ctx.fillStyle = '#d49a2a';
+        ctx.fillRect(3, 8 + bob, 3, 1);
+
+        // Dark recessed scanner visor + moving glowing eye
+        ctx.fillStyle = '#0c101a';
+        ctx.fillRect(4, 4 + bob, 8, 3);
+        const ex = eyeXs[f];
+        ctx.fillStyle = f === 0 ? '#ffaa33' : '#7af5ff';
+        ctx.fillRect(ex, 5 + bob, 2, 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(ex, 5 + bob, 1, 1);
+
+        // Underside thruster nozzle & animated flickering jet flame
+        ctx.fillStyle = '#253347';
+        ctx.fillRect(6, 10 + bob, 4, 1);
+        const flameH = (f % 2 === 0) ? 2 : 3;
+        ctx.fillStyle = '#38b6ff';
+        ctx.fillRect(7, 11 + bob, 2, flameH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(7 + (f & 1), 11 + bob, 1, 1);
+
+        this.droneFrames.push(canvas);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // L. HIGH-CRAFT MOVING MACHINERY SPRITES
     // -----------------------------------------------------------------------
     bakeMachinerySprites() {
-      // 1. Heavy Riveted Freight Elevator Cage (48x18 px floor + side frame bars)
       {
         const w = 48, h = 24;
         const { canvas, ctx } = createOffscreen(w, h);
-        // Top overhead hoist crossbar & clevis ring (y = 0..4)
         ctx.fillStyle = '#090d14';
         ctx.fillRect(21, 0, 6, 3);
         ctx.fillStyle = '#5f7899';
@@ -1904,7 +2272,6 @@
         ctx.fillStyle = '#4e6785';
         ctx.fillRect(4, 2, w - 8, 1);
 
-        // Vertical corner tension struts connecting top bar to cage floor
         for (const sx of [3, w - 6]) {
           ctx.fillStyle = '#0a0f17';
           ctx.fillRect(sx, 3, 3, 12);
@@ -1912,7 +2279,6 @@
           ctx.fillRect(sx + 1, 3, 1, 12);
         }
 
-        // Heavy Steel Cage Deck (y = 14..24 -> deck top sits at y=14)
         const dy = 14;
         ctx.fillStyle = '#080c12';
         ctx.fillRect(0, dy, w, 10);
@@ -1921,7 +2287,6 @@
         ctx.fillStyle = '#7b94ad';
         ctx.fillRect(1, dy, w - 2, 1);
 
-        // Yellow/black industrial hazard stripe band
         for (let x = 2; x < w - 2; x++) {
           for (let y = dy + 3; y < dy + 6; y++) {
             const stripe = ((x + y) % 6) < 3;
@@ -1930,7 +2295,6 @@
           }
         }
 
-        // Underside heavy steel ribs & rivets
         ctx.fillStyle = '#212e40';
         ctx.fillRect(1, dy + 6, w - 2, 3);
         ctx.fillStyle = '#627c9c';
@@ -1943,11 +2307,9 @@
         this.elevatorCage = canvas;
       }
 
-      // 2. Bolted Overhead Pulley Wheel (4 Rotation Frames, 18x18 px)
       for (let f = 0; f < 4; f++) {
         const { canvas, ctx } = createOffscreen(18, 18);
         const cx = 9, cy = 9;
-        // Ceiling mounting housing bracket behind top half
         ctx.fillStyle = '#090d14';
         ctx.fillRect(4, 0, 10, 8);
         ctx.fillStyle = '#314259';
@@ -1955,7 +2317,6 @@
         ctx.fillStyle = '#607a9c';
         ctx.fillRect(5, 0, 8, 1);
 
-        // Outer circular pulley wheel
         for (let y = 0; y < 18; y++) {
           for (let x = 0; x < 18; x++) {
             const dx = x - cx + 0.5;
@@ -1968,7 +2329,6 @@
           }
         }
 
-        // Rotating 4 spokes
         const baseAng = (f * Math.PI) / 8;
         for (let s = 0; s < 4; s++) {
           const ang = baseAng + (s * Math.PI) / 2;
@@ -1979,7 +2339,6 @@
             ctx.fillRect(sx, sy, 1, 1);
           }
         }
-        // Center axle hub
         ctx.fillStyle = '#090d14';
         ctx.fillRect(cx - 2, cy - 2, 4, 4);
         ctx.fillStyle = '#99b4d1';
@@ -1987,29 +2346,23 @@
         this.pulleyWheelFrames.push(canvas);
       }
 
-      // 3. Heavy Cast-Iron Counterweight Block (14x20 px)
       {
         const { canvas, ctx } = createOffscreen(14, 20);
         ctx.fillStyle = '#080b12';
         ctx.fillRect(1, 2, 12, 17);
-        // Hoist eyelet top
         ctx.fillStyle = '#536c8a';
         ctx.fillRect(5, 0, 4, 3);
-        // Main ballast plates
         ctx.fillStyle = '#263447';
         ctx.fillRect(2, 3, 10, 15);
         ctx.fillStyle = '#475e7a';
         ctx.fillRect(2, 3, 10, 2);
-        // Recessed horizontal ribs
         ctx.fillStyle = '#121a26';
         ctx.fillRect(2, 7, 10, 2);
         ctx.fillRect(2, 12, 10, 2);
-        // Hazard stripe band
         for (let x = 3; x < 11; x++) {
           ctx.fillStyle = (x & 1) ? '#c98e2b' : '#18202c';
           ctx.fillRect(x, 15, 1, 2);
         }
-        // Guide rail shoes on left/right
         ctx.fillStyle = '#6f8aa8';
         ctx.fillRect(0, 5, 2, 3);
         ctx.fillRect(0, 14, 2, 3);
@@ -2018,7 +2371,6 @@
         this.counterweight = canvas;
       }
 
-      // 4. Motorized I-Beam Cargo Gondola Trolley (20x12 px)
       {
         const { canvas, ctx } = createOffscreen(20, 12);
         ctx.fillStyle = '#090d14';
@@ -2027,24 +2379,20 @@
         ctx.fillRect(3, 2, 14, 7);
         ctx.fillStyle = '#5f7899';
         ctx.fillRect(3, 2, 14, 1);
-        // Dual flanged rail wheels with glowing amber bearings
         for (const wx of [5, 13]) {
           ctx.fillStyle = '#141c26';
           ctx.fillRect(wx - 1, 0, 4, 4);
           ctx.fillStyle = '#ffaa33';
           ctx.fillRect(wx, 1, 2, 2);
         }
-        // Bottom suspension clevis
         ctx.fillStyle = '#4e6785';
         ctx.fillRect(8, 9, 4, 3);
         this.gondolaTrolley = canvas;
       }
 
-      // 5. Suspended Cargo Gondola Car (44x22 px)
       {
         const w = 44, h = 22;
         const { canvas, ctx } = createOffscreen(w, h);
-        // Overhead suspension yoke & corner rods
         ctx.fillStyle = '#3c506b';
         ctx.fillRect(20, 0, 4, 3);
         ctx.fillRect(4, 2, w - 8, 2);
@@ -2052,7 +2400,6 @@
         ctx.fillRect(4, 4, 2, 10);
         ctx.fillRect(w - 6, 4, 2, 10);
 
-        // Warm work lantern hanging from yoke
         ctx.fillStyle = '#253347';
         ctx.fillRect(19, 3, 6, 3);
         ctx.fillStyle = '#ffaa33';
@@ -2060,7 +2407,6 @@
         ctx.fillStyle = '#fff3d6';
         ctx.fillRect(21, 6, 2, 2);
 
-        // Gondola steel platform floor (top sits at y = 14)
         const dy = 14;
         ctx.fillStyle = '#090d14';
         ctx.fillRect(0, dy, w, 8);
@@ -2080,13 +2426,11 @@
         this.gondolaCar = canvas;
       }
 
-      // 6. Industrial Exhaust Turbine Rotor (4 Rotation Frames, 36x36 px)
       for (let f = 0; f < 4; f++) {
         const size = 36;
         const { canvas, ctx } = createOffscreen(size, size);
         const cx = 18, cy = 18;
 
-        // Recessed dark circular vent cavity & riveted bezel frame
         for (let y = 0; y < size; y++) {
           for (let x = 0; x < size; x++) {
             const dx = x - cx + 0.5;
@@ -2102,7 +2446,6 @@
           }
         }
 
-        // 6 angled spinning turbine blades
         const baseAng = (f * Math.PI) / 12;
         for (let b = 0; b < 6; b++) {
           const ang = baseAng + (b * Math.PI) / 3;
@@ -2120,7 +2463,6 @@
           }
         }
 
-        // Central hub cap + bezel rivets
         ctx.fillStyle = '#0c111a';
         ctx.fillRect(cx - 3, cy - 3, 6, 6);
         ctx.fillStyle = '#6b87a8';
@@ -2137,7 +2479,6 @@
         this.turbineFrames.push(canvas);
       }
 
-      // 7. Pressurized Steam Vent Valve (14x14 px)
       {
         const { canvas, ctx } = createOffscreen(14, 14);
         ctx.fillStyle = '#090d14';
@@ -2146,7 +2487,6 @@
         ctx.fillRect(3, 3, 8, 8);
         ctx.fillStyle = '#5c7594';
         ctx.fillRect(4, 3, 6, 2);
-        // Brass nozzle & pressure gauge
         ctx.fillStyle = '#b87d28';
         ctx.fillRect(5, 5, 4, 4);
         ctx.fillStyle = '#ffcf6e';
@@ -2158,7 +2498,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // K. LAYER 7: EXTREME BLURRED FOREGROUND DEPTH-OF-FIELD SILHOUETTES
+    // M. LAYER 7: EXTREME BLURRED FOREGROUND DEPTH-OF-FIELD SILHOUETTES
     // -----------------------------------------------------------------------
     bakeBlurredForegroundDOF() {
       const makeBlurredChunk = (w, h, drawFn) => {

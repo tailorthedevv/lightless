@@ -56,7 +56,7 @@
   } = GAME;
 
   // =========================================================================
-  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (BIOME DRONE, MACHINERY, STEAM, SFX)
+  // 1. PROCEDURAL WEB AUDIO SYNTHESIZER (BIOME DRONE, MACHINERY, DOORS, ZAPS)
   // =========================================================================
   class AudioEngine {
     constructor() {
@@ -91,7 +91,7 @@
         this.setBiome(this.currentBiome);
         this.started = true;
       } catch (e) {
-        // Ignore audio initialization failures cleanly
+        // Ignore audio errors cleanly
       }
     }
 
@@ -233,6 +233,114 @@
       osc.stop(t + 0.065);
     }
 
+    playBubblePop() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      const base = 320 + Math.random() * 140;
+      osc.frequency.setValueAtTime(base, t);
+      osc.frequency.exponentialRampToValueAtTime(base * 1.9, t + 0.055);
+      gain.gain.setValueAtTime(0.028, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.07);
+    }
+
+    playSwitchClick() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      [440, 880].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = i === 0 ? 'triangle' : 'square';
+        osc.frequency.setValueAtTime(freq, t + i * 0.035);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.55, t + i * 0.035 + 0.045);
+        gain.gain.setValueAtTime(0.08, t + i * 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.035 + 0.055);
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(t + i * 0.035);
+        osc.stop(t + i * 0.035 + 0.06);
+      });
+    }
+
+    playBlastDoorSlide() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(98, t);
+      osc.frequency.linearRampToValueAtTime(58, t + 0.72);
+
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 220;
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.085, t + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.78);
+
+      osc.connect(lp);
+      lp.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.8);
+
+      if (this.noiseBuffer) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuffer;
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 800;
+        const ng = this.ctx.createGain();
+        ng.gain.setValueAtTime(0.001, t);
+        ng.gain.linearRampToValueAtTime(0.04, t + 0.1);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
+        src.connect(bp);
+        bp.connect(ng);
+        ng.connect(this.master);
+        src.start(t);
+        src.stop(t + 0.75);
+      }
+    }
+
+    playElectricZap() {
+      if (!this.started || this.muted) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1400 + Math.random() * 500, t);
+      osc.frequency.exponentialRampToValueAtTime(280, t + 0.07);
+      gain.gain.setValueAtTime(0.036, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.085);
+
+      if (this.noiseBuffer) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuffer;
+        const hp = this.ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 3200;
+        const ng = this.ctx.createGain();
+        ng.gain.setValueAtTime(0.04, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+        src.connect(hp);
+        hp.connect(ng);
+        ng.connect(this.master);
+        src.start(t);
+        src.stop(t + 0.075);
+      }
+    }
+
     playMachineryStart() {
       if (!this.started || this.muted) return;
       const t = this.ctx.currentTime;
@@ -341,7 +449,7 @@
   }
 
   // =========================================================================
-  // 2. UPGRADED LIGHTING ENGINE (SHADOW MASK, VISOR BEAM, TURBINE SLICING, BOUNCE)
+  // 2. UPGRADED LIGHTING ENGINE (CLEAN CIRCULAR PLAYER AURA + FULL WORLD GLOW)
   // =========================================================================
   class LightingEngine {
     constructor() {
@@ -400,30 +508,10 @@
       const px = playerInterp.x + player.w * 0.5;
       const py = playerInterp.y + player.h * 0.45;
 
-      // Subtle player aura + directional headlamp cone carve once awakened
-      carveRadial(px, py, stateFlags.awakened ? 86 : 44, stateFlags.awakened ? 0.94 : 0.65);
-      if (stateFlags.awakened) {
-        const beamDist = 78;
-        const bx = px + player.beamDir * 44;
-        const by = py - 2;
-        const lx = (px - camX) * lScaleX;
-        const ly = (py - camY) * lScaleY;
-        const tx = (px + player.beamDir * beamDist - camX) * lScaleX;
-        const grad = lctx.createRadialGradient(lx, ly, 4, (bx - camX) * lScaleX, (by - camY) * lScaleY, 72 * lScaleX);
-        grad.addColorStop(0, 'rgba(0,0,0,0.85)');
-        grad.addColorStop(0.55, 'rgba(0,0,0,0.45)');
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = grad;
-        lctx.beginPath();
-        lctx.moveTo(lx, ly - 4 * lScaleY);
-        lctx.lineTo(tx, ly - 32 * lScaleY);
-        lctx.lineTo(tx, ly + 28 * lScaleY);
-        lctx.lineTo(lx, ly + 4 * lScaleY);
-        lctx.closePath();
-        lctx.fill();
-      }
+      // Clean, soft atmospheric circular aura around PICO (NO directional cone)
+      carveRadial(px, py, stateFlags.awakened ? 92 : 44, stateFlags.awakened ? 0.94 : 0.65);
 
-      // Lamps light carve
+      // Swinging Lamps light carve
       const lampFlickers = [];
       for (const lamp of level.lamps) {
         const flk = this.getFlicker(time, lamp.seed, false);
@@ -449,28 +537,38 @@
         carveRadial(o.x, o.y, orbRad, 1.0);
       }
 
-      // Crystals / BioMushrooms & Collectible Shards carve
+      // Crystals, Bio-Mushrooms, Bio-Vats & Shards carve
       for (const cr of level.crystals) carveRadial(cr.x + 10, cr.y + 10, 68, 0.88);
+      for (const vat of level.bioVats) carveRadial(vat.x + 10, vat.y + 16, 60, 0.84);
       for (const sh of level.shards) {
         if (!sh.collected) carveRadial(sh.x + 6, sh.y + 7, 46, 0.8);
       }
 
-      // Lore Terminals & Moving Gondola Lanterns + Elevator Beacons
+      // Terminals, Drones, Pistons, Switches, Doors & Moving Machinery carve
       for (const tm of level.terminals) carveRadial(tm.x + 10, tm.y + 8, 52, 0.78);
       if (level.machinery) {
         for (const g of level.machinery.gondolas) {
           const gx = lerp(g.prevX, g.x, stateFlags.alpha) + 22;
           const gy = lerp(g.prevY, g.y, stateFlags.alpha) - 7;
-          carveRadial(gx, gy, 76, 0.88);
+          carveRadial(gx, gy, 78, 0.88);
         }
         for (const e of level.machinery.elevators) {
           const ex = lerp(e.prevX, e.x, stateFlags.alpha) + 24;
           const ey = lerp(e.prevY, e.y, stateFlags.alpha) - 6;
-          carveRadial(ex, ey, 58, 0.72);
+          carveRadial(ex, ey, 60, 0.74);
+        }
+        for (const dr of level.machinery.drones) {
+          carveRadial(dr.x + 8, dr.y + 6, 48, 0.78);
+        }
+        for (const sw of level.machinery.switches) {
+          carveRadial(sw.x + 8, sw.y + 6, 36, 0.72);
+        }
+        for (const d of level.machinery.blastDoors) {
+          carveRadial(d.x + 8, d.y + 24, 42, 0.68);
         }
       }
 
-      // Activated conduit lights & Sector 09 open night sky breach
+      // Activated conduit lights & Sector 09 Sky Breach / Hazards
       if (level.orb && level.orb.activated) {
         for (const cl of level.conduitLights) carveRadial(cl.x, cl.y - 4, 42, 0.72);
       }
@@ -479,23 +577,28 @@
       }
       if (level.biome === 'sector09') {
         carveRadial(36 * TILE_SIZE, 2 * TILE_SIZE, 150, 0.82);
-        // Bottom magma hazard glow carve
         for (const hz of level.hazards) {
           for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
-            carveRadial(hx, hz.y, 72, 0.75);
+            carveRadial(hx, hz.y, 76, 0.82);
+          }
+        }
+      } else if (level.biome === 'sector07') {
+        for (const hz of level.hazards) {
+          for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
+            carveRadial(hx, hz.y, 64, 0.68);
           }
         }
       }
 
       lctx.globalCompositeOperation = 'source-over';
 
-      // Composite smooth shadow mask over crisp pixel scene
+      // Composite smooth shadow mask over scene
       displayCtx.save();
       displayCtx.imageSmoothingEnabled = true;
       displayCtx.globalCompositeOperation = 'source-over';
       displayCtx.drawImage(this.lightCanvas, 0, 0, dispW, dispH);
 
-      // 2. Additive Volumetric Cones, Turbine Light-Slicing, Bounce & Blooms
+      // 2. Additive Volumetric Cones, Turbine Slicing, Bounce & Blooms
       displayCtx.globalCompositeOperation = 'lighter';
 
       const drawBloom = (wx, wy, rad, stops) => {
@@ -514,13 +617,11 @@
       const [sr, sg, sb] = pal.shaftColor;
       const turbines = level.machinery ? level.machinery.turbines : [];
 
-      // Angled volumetric shafts with rotating turbine blade slicing modulation!
+      // Volumetric cavern shafts modulated by rotating turbine light-slicing
       for (const sxWorld of [180, 520, 860]) {
         let sliceMod = 1.0;
         for (const tb of turbines) {
-          if (Math.abs(sxWorld - (tb.x + 18)) < 90) {
-            sliceMod *= tb.lightPulse;
-          }
+          if (Math.abs(sxWorld - (tb.x + 18)) < 90) sliceMod *= tb.lightPulse;
         }
         const sx = (sxWorld - camX) * sxScale;
         const sy = (15 - camY) * syScale;
@@ -540,7 +641,7 @@
         displayCtx.fill();
       }
 
-      // Direct turbine vent pulsing backlight shafts
+      // Direct turbine vent slicing pulse
       for (const tb of turbines) {
         drawBloom(tb.x + 18, tb.y + 18, 52 * tb.lightPulse, [
           [0.0, `rgba(${sr}, ${sg}, ${sb}, ${0.18 * tb.lightPulse})`],
@@ -548,7 +649,7 @@
         ]);
       }
 
-      // Biome-specific Lamp Blooms, Volumetric Cones & Floor Bounce
+      // Swinging Lamp Blooms & Tilted Volumetric Cones
       const [lr, lg, lb] = pal.lampGlow;
       level.lamps.forEach((lamp, i) => {
         const flk = lampFlickers[i];
@@ -564,7 +665,8 @@
         const cy = (by - camY) * syScale;
         const coneH = 92 * syScale;
         const coneW = 54 * sxScale;
-        const cg = displayCtx.createLinearGradient(cx, cy, cx, cy + coneH);
+        const swingShift = Math.sin(lamp.angle || 0) * 32 * sxScale;
+        const cg = displayCtx.createLinearGradient(cx, cy, cx + swingShift, cy + coneH);
         cg.addColorStop(0, `rgba(${lr}, ${lg}, ${lb}, ${0.18 * flk})`);
         cg.addColorStop(0.7, `rgba(${lr}, ${lg}, ${lb}, ${0.05 * flk})`);
         cg.addColorStop(1, `rgba(${lr}, ${lg}, ${lb}, 0)`);
@@ -572,13 +674,12 @@
         displayCtx.beginPath();
         displayCtx.moveTo(cx - 5 * sxScale, cy);
         displayCtx.lineTo(cx + 5 * sxScale, cy);
-        displayCtx.lineTo(cx + coneW, cy + coneH);
-        displayCtx.lineTo(cx - coneW, cy + coneH);
+        displayCtx.lineTo(cx + coneW + swingShift, cy + coneH);
+        displayCtx.lineTo(cx - coneW + swingShift, cy + coneH);
         displayCtx.closePath();
         displayCtx.fill();
 
-        // Floor bounce glow beneath lamp
-        drawBloom(bx, by + 64, 40 * flk, [
+        drawBloom(bx + swingShift * 0.25, by + 64, 40 * flk, [
           [0.0, `rgba(${lr}, ${lg}, ${lb}, ${0.11 * flk})`],
           [1.0, `rgba(${lr}, ${lg}, ${lb}, 0)`]
         ]);
@@ -621,7 +722,7 @@
         ]);
       }
 
-      // Crystal / Bioluminescent Mushroom Floor Bounce Glow
+      // Crystal, Bio-Mushroom & Bubbling Bio-Vat Floor Bounce Glows
       for (const cr of level.crystals) {
         const pulse = 0.88 + 0.12 * Math.sin(time * 2.8 + cr.x);
         const isBio = level.biome === 'sector07';
@@ -635,7 +736,31 @@
         ]);
       }
 
-      // Steam Vent Bounce Glow & Gondola Lantern Glow
+      for (const vat of level.bioVats) {
+        const isMagma = level.biome === 'sector09';
+        const pulse = 0.88 + 0.12 * Math.sin(time * 4 + vat.phase);
+        drawBloom(vat.x + 10, vat.y + 18, 44 * pulse, [
+          [0.0, isMagma ? 'rgba(255, 195, 90, 0.30)' : 'rgba(110, 255, 230, 0.28)'],
+          [0.5, isMagma ? 'rgba(255, 95, 30, 0.14)' : 'rgba(35, 190, 165, 0.14)'],
+          [1.0, 'rgba(0, 0, 0, 0)']
+        ]);
+      }
+
+      // Broken Cable Electric Arc Flash Blooms
+      if (level.verlet) {
+        for (const ch of level.verlet.chains) {
+          if (ch.broken && ch.sparkTimer > 1.25) {
+            const tip = ch.nodes[ch.nodes.length - 1];
+            drawBloom(tip.x, tip.y, 34, [
+              [0.0, 'rgba(220, 250, 255, 0.45)'],
+              [0.5, 'rgba(90, 200, 255, 0.20)'],
+              [1.0, 'rgba(90, 200, 255, 0)']
+            ]);
+          }
+        }
+      }
+
+      // Machinery Glows: Steam Vents, Gondola Lanterns, Pistons, Switches, Doors, Drones
       if (level.machinery) {
         for (const sv of level.machinery.steamVents) {
           if (sv.active) {
@@ -654,14 +779,40 @@
             [1.0, 'rgba(255, 150, 40, 0)']
           ]);
         }
+        for (const p of level.machinery.pistons) {
+          drawBloom(p.x + 5, p.y + 12, 22, [
+            [0.0, 'rgba(85, 245, 220, 0.22)'],
+            [1.0, 'rgba(85, 245, 220, 0)']
+          ]);
+        }
+        for (const sw of level.machinery.switches) {
+          drawBloom(sw.x + 8, sw.y + 4, 24, [
+            [0.0, sw.pressed ? 'rgba(110, 232, 154, 0.28)' : 'rgba(255, 65, 85, 0.26)'],
+            [1.0, 'rgba(0, 0, 0, 0)']
+          ]);
+        }
+        for (const d of level.machinery.blastDoors) {
+          drawBloom(d.x + 8, d.y + 24, 28, [
+            [0.0, d.opening ? 'rgba(110, 232, 154, 0.22)' : 'rgba(255, 60, 80, 0.20)'],
+            [1.0, 'rgba(0, 0, 0, 0)']
+          ]);
+        }
+        for (const dr of level.machinery.drones) {
+          drawBloom(dr.x + 8, dr.y + 7, 34, [
+            [0.0, 'rgba(130, 235, 255, 0.28)'],
+            [0.5, 'rgba(56, 182, 255, 0.12)'],
+            [1.0, 'rgba(56, 182, 255, 0)']
+          ]);
+        }
       }
 
-      // Hazard Sump Bottom Glow (Sector 07 Coolant / Sector 09 Molten Magma)
+      // Intense Liquid Upward Heat & Bioluminescent Bounce Blooms
       for (const hz of level.hazards) {
         const isLava = level.biome === 'sector09';
         for (let hx = hz.x + 24; hx < hz.x + hz.w; hx += 64) {
-          drawBloom(hx, hz.y, 68, [
-            [0.0, isLava ? 'rgba(255, 115, 35, 0.24)' : 'rgba(55, 240, 200, 0.16)'],
+          drawBloom(hx, hz.y, isLava ? 82 : 64, [
+            [0.0, isLava ? 'rgba(255, 145, 45, 0.34)' : 'rgba(65, 255, 215, 0.22)'],
+            [0.55, isLava ? 'rgba(255, 65, 20, 0.14)' : 'rgba(25, 180, 155, 0.08)'],
             [1.0, 'rgba(0, 0, 0, 0)']
           ]);
         }
@@ -679,32 +830,14 @@
         displayCtx.fillRect(ex - 26 * sxScale, 0, 52 * sxScale, ey);
       }
 
-      // Directional Robot Visor Headlamp Cone + Rim Glow
-      if (stateFlags.awakened) {
-        const vx = (px + player.beamDir * 4 - camX) * sxScale;
-        const vy = (py - 2 - camY) * syScale;
-        const beamLen = 96 * sxScale;
-        const beamTipX = vx + player.beamDir * beamLen;
-        const vg = displayCtx.createLinearGradient(vx, vy, beamTipX, vy);
-        vg.addColorStop(0, 'rgba(165, 240, 255, 0.20)');
-        vg.addColorStop(0.5, 'rgba(120, 210, 255, 0.08)');
-        vg.addColorStop(1, 'rgba(120, 210, 255, 0)');
-        displayCtx.fillStyle = vg;
-        displayCtx.beginPath();
-        displayCtx.moveTo(vx, vy - 2 * syScale);
-        displayCtx.lineTo(beamTipX, vy - 24 * syScale);
-        displayCtx.lineTo(beamTipX, vy + 22 * syScale);
-        displayCtx.lineTo(vx, vy + 2 * syScale);
-        displayCtx.closePath();
-        displayCtx.fill();
-      }
-      drawBloom(px, py, 38, [
-        [0.0, 'rgba(200, 232, 255, 0.16)'],
-        [0.6, 'rgba(120, 185, 255, 0.06)'],
+      // Clean Soft Protective Circular Rim-Glow Around PICO
+      drawBloom(px, py, 44, [
+        [0.0, 'rgba(210, 238, 255, 0.22)'],
+        [0.55, 'rgba(120, 195, 255, 0.09)'],
         [1.0, 'rgba(90, 150, 255, 0)']
       ]);
 
-      // 3. Biome Color-Grading Mist + Silky Cinematic Vignette
+      // 3. Biome Atmospheric Tint & Silky Radial Vignette
       displayCtx.globalCompositeOperation = 'source-over';
       displayCtx.fillStyle = pal.fogTint;
       displayCtx.fillRect(0, 0, dispW, dispH);
@@ -742,7 +875,6 @@
       this.assets = assets;
 
       this.facing = 1;
-      this.beamDir = 1;
       this.grounded = false;
       this.onTruss = false;
       this.onMetal = false;
@@ -783,7 +915,6 @@
         this.facing = moveDir;
         this.hasMoved = true;
       }
-      this.beamDir = lerp(this.beamDir, this.facing, 1 - Math.exp(-12 * dt));
 
       const maxSpeed = 114;
       const accel = this.grounded ? 920 : 620;
@@ -835,11 +966,9 @@
       const gravity = this.vy < 0 ? 850 : 940;
       this.vy = Math.min(410, this.vy + gravity * dt);
 
-      // Horizontal step
       this.x += this.vx * dt;
       this.resolveHorizontal(level);
 
-      // Vertical step + moving machinery landing
       const prevBottom = this.y + this.h;
       const prevVy = this.vy;
       const wasGrounded = this.grounded;
@@ -882,7 +1011,6 @@
         this.stepSoundTimer = 0.06;
       }
 
-      // Shallow puddle splash
       for (const pd of level.puddles) {
         const feetY = this.y + this.h;
         const cx = this.x + this.w * 0.5;
@@ -963,7 +1091,6 @@
           }
         }
 
-        // Moving machinery platform landing check (zero-slip deck capture)
         for (const plat of platforms) {
           if (this.x + this.w - 1 > plat.x && this.x + 1 < plat.x + plat.w) {
             const catchTop = Math.max(plat.prevY, plat.y) + 5;
@@ -989,10 +1116,8 @@
       }
     }
 
-    getRenderFrame(awakened, wakeTimer) {
-      if (!awakened) {
-        return this.assets.robotFrames.sleep[0];
-      }
+    getRenderFrame(awakened) {
+      if (!awakened) return this.assets.robotFrames.sleep[0];
       if (!this.grounded) {
         return this.vy < 0 ? this.assets.robotFrames.jump[0] : this.assets.robotFrames.fall[0];
       }
@@ -1004,20 +1129,19 @@
       return this.assets.robotFrames.idle[idx];
     }
 
-    render(ctx, intCamX, intCamY, alpha, awakened, wakeTimer, flipY = false) {
+    render(ctx, intCamX, intCamY, alpha, awakened, wakeTimer) {
       const rx = lerp(this.prevX, this.x, alpha);
       const ry = lerp(this.prevY, this.y, alpha);
-      const frame = this.getRenderFrame(awakened, wakeTimer);
+      const frame = this.getRenderFrame(awakened);
 
       const footX = Math.round(rx + this.w * 0.5 - intCamX);
       const footY = Math.round(ry + this.h - intCamY);
 
       ctx.save();
       ctx.translate(footX, footY);
-      ctx.scale(this.facing * this.squashX, (flipY ? -1 : 1) * this.squashY);
+      ctx.scale(this.facing * this.squashX, this.squashY);
       ctx.drawImage(frame, -12, -22);
 
-      // Expressive glowing pixel eyes (powered off during first 0.65s of awakening)
       const visorLit = awakened || (wakeTimer >= 0.65 && Math.sin(wakeTimer * 45) > -0.2);
       if (visorLit) {
         const vx = frame.visorX - 12;
@@ -1120,7 +1244,7 @@
       this.displayCanvas = document.getElementById('displayCanvas');
       this.displayCtx = this.displayCanvas.getContext('2d');
 
-      // 2px margin buffer enables 120Hz+ sub-pixel camera sliding while keeping pixels crisp
+      // 482x272 margin buffer enables smooth 120Hz+ sub-pixel camera sliding
       const pix = createOffscreen(PIXEL_W + 2, PIXEL_H + 2);
       this.pixelCanvas = pix.canvas;
       this.pixelCtx = pix.ctx;
@@ -1138,7 +1262,6 @@
       this.player = new Player(0, 0, this.assets);
       this.camera = new Camera(this.level.worldW, this.level.worldH, 0, 0);
 
-      // Campaign & story progression state
       this.time = 0;
       this.runTime = 0;
       this.accumulator = 0;
@@ -1155,12 +1278,18 @@
       this.wakeTimer = 0;
       this.activeTerminal = null;
 
-      this.transitionState = 'none'; // 'none', 'fadeOut', 'fadeIn', 'respawnOut', 'respawnIn'
+      this.transitionState = 'none';
       this.transitionAlpha = 0;
       this.pendingSector = null;
 
       this.finaleActive = false;
       this.finaleTimer = 0;
+
+      // Audio state trackers for doors, switches, broken cable zaps & liquid pops
+      this._doorSliding = new Set();
+      this._switchStates = new Map();
+      this._cableTimers = new Map();
+      this._prevBubbleCount = 0;
 
       this.input = {
         left: false,
@@ -1186,6 +1315,11 @@
       this.player.resetPosition(this.level.spawn.x, this.level.spawn.y);
       this.camera.snapTo(this.player.x, this.player.y);
       this.activeTerminal = null;
+
+      this._doorSliding.clear();
+      this._switchStates.clear();
+      this._cableTimers.clear();
+      this._prevBubbleCount = 0;
 
       if (isInitial) {
         this.awakened = false;
@@ -1214,9 +1348,7 @@
           this.input.jumpHeld = true;
           e.preventDefault();
         }
-        if (code === 'KeyM') {
-          this.audio.toggleMute();
-        }
+        if (code === 'KeyM') this.audio.toggleMute();
         if (code === 'KeyR') {
           if (this.finaleActive) {
             this.transitionState = 'fadeOut';
@@ -1273,7 +1405,6 @@
       this.time += dt;
       if (!this.finaleActive) this.runTime += dt;
 
-      // Handle Awakening Sequence in Act I
       if (!this.awakened) {
         this.wakeTimer += dt;
         if (this.wakeTimer >= 1.1) {
@@ -1283,7 +1414,6 @@
         }
       }
 
-      // Handle Sector & Respawn Transitions
       if (this.transitionState === 'fadeOut') {
         this.transitionAlpha = Math.min(1, this.transitionAlpha + dt * 2.1);
         if (this.transitionAlpha >= 1) {
@@ -1321,15 +1451,29 @@
         this.transitionState !== 'respawnOut' &&
         !this.finaleActive;
 
-      // 1. Update Machinery + Carry Player seamlessly (zero-slip riding)
+      // 1. Update Machinery + Carry Player seamlessly
       this.machinery.update(dt, this.level, this.player, this.particles, this.audio, this.camera, () => {
         if (this.transitionState === 'none') {
           this.pendingSector = this.sectorIndex + 1;
           this.transitionState = 'fadeOut';
         }
       });
-      if (canControl) {
-        this.machinery.carryPlayer(this.player, this.level);
+      if (canControl) this.machinery.carryPlayer(this.player, this.level);
+
+      // Audio triggers for Switches & Blast Doors
+      for (const sw of this.machinery.switches) {
+        const was = this._switchStates.get(sw.id) || false;
+        if (!was && sw.pressed) {
+          this.audio.playSwitchClick();
+          this.showBanner('VAULT BLAST DOOR UNLOCKED');
+        }
+        this._switchStates.set(sw.id, sw.pressed);
+      }
+      for (const d of this.machinery.blastDoors) {
+        if (d.opening && !this._doorSliding.has(d.id)) {
+          this._doorSliding.add(d.id);
+          this.audio.playBlastDoorSlide();
+        }
       }
 
       // 2. Player Physics
@@ -1345,10 +1489,31 @@
       this.particles.update(dt, this.time, this.level, this.audio);
       this.camera.update(dt, this.player, this.finaleActive);
 
+      // Audio triggers for Electric Cable Zaps & Coolant Bubble Pops (when near camera)
+      const camCx = this.camera.x + PIXEL_W * 0.5;
+      const camCy = this.camera.y + PIXEL_H * 0.5;
+      for (let i = 0; i < this.verlet.chains.length; i++) {
+        const ch = this.verlet.chains[i];
+        if (!ch.broken) continue;
+        const prevT = this._cableTimers.get(i) || 0;
+        if (ch.sparkTimer > prevT + 0.5) {
+          const tip = ch.nodes[ch.nodes.length - 1];
+          if (Math.hypot(tip.x - camCx, tip.y - camCy) < 290) {
+            this.audio.playElectricZap();
+          }
+        }
+        this._cableTimers.set(i, ch.sparkTimer);
+      }
+      const bCount = this.particles.liquidBubbles.length;
+      if (this.level.biome === 'sector07' && bCount < this._prevBubbleCount && Math.random() < 0.45) {
+        this.audio.playBubblePop();
+      }
+      this._prevBubbleCount = bCount;
+
       const pcx = this.player.x + this.player.w * 0.5;
       const pcy = this.player.y + this.player.h * 0.5;
 
-      // 4. Hazard Basin Collision Check (Sector 07 Coolant / Sector 09 Magma)
+      // 4. Hazard Basin Collision Check
       if (this.transitionState === 'none' && !this.finaleActive) {
         for (const hz of this.level.hazards) {
           if (pcx > hz.x && pcx < hz.x + hz.w && this.player.y + this.player.h > hz.y + 3) {
@@ -1379,8 +1544,7 @@
       // 6. Interactive Lore Terminals & Checkpoint Save
       let nearestTerm = null;
       for (const tm of this.level.terminals) {
-        const dist = Math.hypot(pcx - (tm.x + 10), pcy - (tm.y + 12));
-        if (dist < 28) {
+        if (Math.hypot(pcx - (tm.x + 10), pcy - (tm.y + 12)) < 28) {
           nearestTerm = tm;
           if (!tm.read) {
             tm.read = true;
@@ -1475,7 +1639,7 @@
       pctx.imageSmoothingEnabled = false;
       pctx.clearRect(0, 0, PIXEL_W + 2, PIXEL_H + 2);
 
-      // LAYER 0: Abyssal Atmospheric Backdrop (or Dawn Sky during Surface Finale)
+      // LAYER 0: Abyssal Atmospheric Backdrop (or Dawn Sky during Finale)
       pctx.drawImage(bg.backdrop, 0, 0, PIXEL_W + 2, PIXEL_H + 2);
       if (this.finaleActive) {
         const skyAlpha = clamp(this.finaleTimer / 2.4, 0, 0.92);
@@ -1484,20 +1648,37 @@
         pctx.globalAlpha = 1;
       }
 
-      // LAYER 1-3: Multi-Layer Parallax Architecture, Brick Vaults & Foliage
+      // LAYER 1-3: Parallax Architecture, Brick Vaults (+ blinking server LEDs) & Foliage
       this.drawTiledParallax(pctx, bg.megaArch, camInterpX * 0.15, camInterpY * 0.15);
       this.drawTiledParallax(pctx, bg.brickVault, camInterpX * 0.35, camInterpY * 0.35);
+      this.drawBrickVaultBlinkLEDs(pctx, bg.brickVault, camInterpX * 0.35, camInterpY * 0.35);
       this.drawTiledParallax(pctx, bg.foliage, camInterpX * 0.7, camInterpY * 0.55);
 
-      // LAYER 4a: Background Wall Pipes & Recessed Spinning Exhaust Turbines
+      // LAYER 4a: Anchored Wall Bulkhead Pipe Columns & Recessed Spinning Turbines
       for (const pipe of this.level.pipes) {
         const px = Math.round(pipe.x - intCamX);
         const py = Math.round(pipe.y - intCamY);
-        if (px > -40 && px < PIXEL_W + 40 && py > -60 && py < PIXEL_H + 60) {
-          pctx.drawImage(pipe.sprite, px, py);
-        }
+        if (px < -40 || px > PIXEL_W + 40) continue;
+
+        // Vertical riveted steel conduit column connecting floor-to-ceiling
+        const topY = Math.round(pipe.anchorTopY - intCamY);
+        const botY = Math.round(pipe.anchorBotY - intCamY);
+        const spanH = Math.max(0, botY - topY);
+        pctx.fillStyle = '#070b12';
+        pctx.fillRect(px + 4, topY, 22, spanH);
+        pctx.fillStyle = '#141e2e';
+        pctx.fillRect(px + 6, topY, 6, spanH);
+        pctx.fillRect(px + 17, topY, 8, spanH);
+        pctx.fillStyle = '#2d3f59';
+        pctx.fillRect(px + 7, topY, 2, spanH);
+        pctx.fillRect(px + 18, topY, 2, spanH);
+        pctx.drawImage(this.assets.anchorPlate, px + 11, topY - 1);
+        pctx.drawImage(this.assets.anchorPlate, px + 11, botY - 4);
+
+        const pfIdx = Math.floor(this.time * 2.2 + pipe.x * 0.1) % pipe.frames.length;
+        pctx.drawImage(pipe.frames[pfIdx], px, py);
       }
-      this.machinery.renderBackground(pctx, intCamX, intCamY, this.assets);
+      this.machinery.renderBackground(pctx, intCamX, intCamY, this.assets, this.time);
 
       // LAYER 4b: Auto-Tiled Terrain & Steel Truss Bridges
       const minCol = Math.max(0, Math.floor(intCamX / TILE_SIZE) - 1);
@@ -1516,17 +1697,17 @@
             const v = this.level.variants[r][c];
             pctx.drawImage(this.assets.getStoneTile(biome, mask, v), wx - 2, wy - 6);
 
-            if ((mask & 9) === 9 && !this.level.isSolidAtTile(c - 1, r - 1)) pctx.drawImage(corners.NW, wx, wy);
-            if ((mask & 3) === 3 && !this.level.isSolidAtTile(c + 1, r - 1)) pctx.drawImage(corners.NE, wx + 12, wy);
-            if ((mask & 6) === 6 && !this.level.isSolidAtTile(c + 1, r + 1)) pctx.drawImage(corners.SE, wx + 12, wy + 12);
-            if ((mask & 12) === 12 && !this.level.isSolidAtTile(c - 1, r + 1)) pctx.drawImage(corners.SW, wx, wy + 12);
+            if ((mask & 9) === 9 && !this.level.isGridSolid(c - 1, r - 1)) pctx.drawImage(corners.NW, wx, wy);
+            if ((mask & 3) === 3 && !this.level.isGridSolid(c + 1, r - 1)) pctx.drawImage(corners.NE, wx + 12, wy);
+            if ((mask & 6) === 6 && !this.level.isGridSolid(c + 1, r + 1)) pctx.drawImage(corners.SE, wx + 12, wy + 12);
+            if ((mask & 12) === 12 && !this.level.isGridSolid(c - 1, r + 1)) pctx.drawImage(corners.SW, wx, wy + 12);
           } else if (cell === 'T') {
             pctx.drawImage(this.assets.getTrussTile(biome, this.level.variants[r][c]), wx, wy);
           }
         }
       }
 
-      // LAYER 4c: Anchored Props (Crates, Crystals/Mushrooms, Terminals, Signs, Lamps)
+      // LAYER 4c: Anchored Props (Crates, Crystals, Bio-Vats, Terminals, Signs, Swinging Lamps)
       for (const cr of this.level.crates) {
         pctx.drawImage(cr.sprite, Math.round(cr.x - intCamX), Math.round(cr.y - intCamY));
       }
@@ -1535,7 +1716,11 @@
         pctx.drawImage(crystal.sprite, Math.round(crystal.x - intCamX), Math.round(crystal.y - intCamY));
       }
 
-      // Lore CRT Terminals with flickering phosphor screens
+      for (const vat of this.level.bioVats) {
+        const fIdx = Math.floor(this.time * 5 + vat.phase) % vat.frames.length;
+        pctx.drawImage(vat.frames[fIdx], Math.round(vat.x - intCamX), Math.round(vat.y - intCamY));
+      }
+
       for (const tm of this.level.terminals) {
         const tx = Math.round(tm.x - intCamX);
         const ty = Math.round(tm.y - intCamY);
@@ -1551,7 +1736,6 @@
         }
       }
 
-      // Surface Broadcast Relay Spire
       if (this.level.exitGate) {
         const gate = this.level.exitGate;
         const gx = Math.round(gate.x - intCamX);
@@ -1563,7 +1747,6 @@
         pctx.fillRect(gx + 16, gy - 1, 2, 2);
       }
 
-      // Anchored Signs + Suspension Rods + Flickering Fluorescent Tubes
       for (const sign of this.level.signs) {
         const sx = Math.round(sign.x - intCamX);
         const sy = Math.round(sign.y - intCamY);
@@ -1590,7 +1773,6 @@
         }
       }
 
-      // Conduit indicator lights along station deck
       if (this.level.orb) {
         for (const cl of this.level.conduitLights) {
           const lx = Math.round(cl.x - intCamX);
@@ -1602,7 +1784,7 @@
         }
       }
 
-      // Anchored Lamps (Ceiling Flange Plate or Wall Cantilever Arm)
+      // Swinging Anchored Lamps (with rotated pendulum cord & lamp fixture)
       for (const lamp of this.level.lamps) {
         const lx = Math.round(lamp.x - intCamX);
         const ly = Math.round(lamp.y - intCamY);
@@ -1611,17 +1793,23 @@
 
         if (lamp.anchorType === 'ceiling') {
           pctx.drawImage(this.assets.anchorPlate, ax - 5, ay - 1);
-          pctx.fillStyle = '#141c29';
-          pctx.fillRect(lx + 9, ay, 2, Math.max(0, ly - ay + 2));
+          this.verlet.drawPixelLine(pctx, ax, ay + 2, lx + 10, ly + 3, '#182233', 2);
+          this.verlet.drawPixelLine(pctx, ax, ay + 2, lx + 10, ly + 3, '#3c4f69', 1);
+
+          pctx.save();
+          pctx.translate(lx + 10, ly + 2);
+          pctx.rotate(-(lamp.angle || 0));
+          pctx.drawImage(lamp.sprite, -10, -2);
+          pctx.restore();
         } else if (lamp.anchorType === 'wallLeft') {
           pctx.drawImage(this.assets.wallBracketLeft, ax - 1, ay);
+          pctx.drawImage(lamp.sprite, lx, ly);
         } else if (lamp.anchorType === 'wallRight') {
           pctx.drawImage(this.assets.wallBracketRight, ax - 13, ay);
+          pctx.drawImage(lamp.sprite, lx, ly);
         }
-        pctx.drawImage(lamp.sprite, lx, ly);
       }
 
-      // Suspended Energy Core Orb
       if (this.level.orb) {
         const orb = this.level.orb;
         const ox = Math.round(orb.x - intCamX);
@@ -1642,7 +1830,6 @@
         }
       }
 
-      // Collectible Shards
       for (const sh of this.level.shards) {
         if (sh.collected) continue;
         const bob = Math.round(Math.sin(this.time * 3.4 + sh.phase) * 2.2);
@@ -1654,22 +1841,22 @@
         );
       }
 
-      // LAYER 4d: Moving Machinery (Elevators, Pulleys, Counterweights, Gondolas, Vents)
+      // LAYER 4d: Moving Machinery (Elevators, Pulleys, Counterweights, Gondolas, Pistons, Doors, Switches, Drones)
       this.machinery.renderForeground(pctx, intCamX, intCamY, this.assets, this.time, alpha);
 
-      // LAYER 4e: Real-Time Puddle Reflections & Shimmering Water/Coolant/Magma Basins
+      // LAYER 4e: Multi-Layered Animated Liquid Basins & Real-Time Reflections
       this.renderPuddlesAndReflections(pctx, intCamX, intCamY, alpha);
 
-      // LAYER 4f: Verlet Chains, Cables & Interactive Grass/Spore Blades
+      // LAYER 4f: Verlet Chains, Broken Sparking Cables & Interactive Grass/Spore Blades
       this.verlet.render(pctx, intCamX, intCamY, this.assets, biome);
 
       // LAYER 4g: Protagonist UNIT-04 "PICO"
-      this.player.render(pctx, intCamX, intCamY, alpha, this.awakened, this.wakeTimer, false);
+      this.player.render(pctx, intCamX, intCamY, alpha, this.awakened, this.wakeTimer);
 
       // LAYER 5: Atmospheric Particles
       this.particles.render(pctx, intCamX, intCamY, this.time, this.level);
 
-      // Interactive Floating Lore Window on Pixel Canvas (or Crisp HUD)
+      // World Tooltips
       this.renderWorldTooltips(pctx, intCamX, intCamY);
 
       // ---------------------------------------------------------------------
@@ -1691,7 +1878,7 @@
         (PIXEL_H + 2) * syScale
       );
 
-      // LAYER 6: Smooth HD Lighting, Visor Headlamp, Turbine Slicing, Blooms & Vignette
+      // LAYER 6: Smooth HD Lighting, Turbine Slicing, Swinging Cones & Vignette
       this.lighting.render(
         dctx,
         dispW,
@@ -1712,15 +1899,38 @@
         }
       );
 
-      // LAYER 7: Extreme Blurred Foreground Depth-of-Field Framing (1.3x Parallax)
+      // LAYER 7: Blurred Foreground Depth-of-Field Framing (1.3x Parallax)
       this.renderBlurredForeground(dctx, dispW, dispH, camInterpX, camInterpY);
 
-      // Minimalist Diegetic HUD, Transition Fade & Surface Finale Stats
+      // Minimalist HUD & Overlays
       this.renderHUDAndOverlays(dctx, dispW, dispH);
     }
 
+    drawBrickVaultBlinkLEDs(ctx, brickVault, ox, oy) {
+      if (!brickVault.leds) return;
+      const w = brickVault.width;
+      const h = brickVault.height;
+      const startX = -((Math.floor(ox) % w + w) % w);
+      const startY = -((Math.floor(oy) % h + h) % h);
+      for (let y = startY; y < PIXEL_H + 2; y += h) {
+        for (let x = startX; x < PIXEL_W + 2; x += w) {
+          for (const led of brickVault.leds) {
+            const on = Math.sin(this.time * 3.8 + led.phase) > -0.15;
+            const lx = x + led.x;
+            const ly = y + led.y;
+            if (lx < 0 || lx > PIXEL_W + 2 || ly < 0 || ly > PIXEL_H + 2) continue;
+            ctx.fillStyle = on ? led.color : '#070b14';
+            ctx.fillRect(lx, ly, 1, 1);
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // OVERHAULED MULTI-LAYERED ANIMATED LIQUIDS & REAL-TIME REFLECTIONS
+    // -----------------------------------------------------------------------
     renderPuddlesAndReflections(ctx, intCamX, intCamY, alpha) {
-      const pal = this.level.palette;
+      const biome = this.level.biome;
       const prx = lerp(this.player.prevX, this.player.x, alpha);
       const pry = lerp(this.player.prevY, this.player.y, alpha);
 
@@ -1729,69 +1939,162 @@
         const py = Math.round(pd.y - intCamY);
         if (px + pd.w < 0 || px > PIXEL_W + 2 || py + pd.h < 0 || py > PIXEL_H + 2) continue;
 
-        // 1. Clipped Real-Time Flipped Wave-Distorted Reflections
         ctx.save();
         ctx.beginPath();
-        ctx.rect(px, py, pd.w, pd.h);
+        ctx.rect(px, py - 1, pd.w, pd.h + 1);
         ctx.clip();
 
-        // Reflected glowing crystals / mushrooms
-        ctx.globalAlpha = 0.36;
-        for (const cr of this.level.crystals) {
-          const cx = cr.x + cr.sprite.width * 0.5;
-          if (cx >= pd.x - 16 && cx <= pd.x + pd.w + 16 && Math.abs(cr.y + cr.sprite.height - pd.y) < 55) {
-            const wave = Math.round(Math.sin(this.time * 4.2 + cr.x) * 1.3);
-            ctx.save();
-            ctx.translate(Math.round(cr.x - intCamX + wave), Math.round(2 * pd.y - (cr.y + cr.sprite.height) - intCamY + cr.sprite.height));
-            ctx.scale(1, -1);
-            ctx.drawImage(cr.sprite, 0, 0);
-            ctx.restore();
+        if (biome === 'sector04') {
+          // 1. Sector 04 Deep Sapphire Water Depth Gradient
+          const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
+          grad.addColorStop(0, 'rgba(18, 56, 94, 0.78)');
+          grad.addColorStop(0.5, 'rgba(10, 32, 62, 0.85)');
+          grad.addColorStop(1, 'rgba(4, 14, 30, 0.92)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(px, py, pd.w, pd.h);
+
+          // Drifting caustic light bands inside water
+          for (let x = 0; x < pd.w; x += 6) {
+            const caustic = Math.sin(this.time * 2.1 + x * 0.14);
+            if (caustic > 0.35) {
+              ctx.fillStyle = 'rgba(110, 200, 245, 0.16)';
+              ctx.fillRect(px + x, py + 2, 4, 1);
+            }
+            if (caustic < -0.45) {
+              ctx.fillStyle = 'rgba(75, 165, 220, 0.12)';
+              ctx.fillRect(px + x + 1, py + 4, 3, 1);
+            }
+          }
+        } else if (biome === 'sector07') {
+          // 2. Sector 07 Bioluminescent Green Coolant Fluid
+          const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
+          grad.addColorStop(0, 'rgba(20, 118, 102, 0.82)');
+          grad.addColorStop(0.55, 'rgba(9, 68, 64, 0.90)');
+          grad.addColorStop(1, 'rgba(4, 28, 30, 0.95)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(px, py, pd.w, pd.h);
+
+          // Swirling glowing chemical veins inside coolant
+          for (let x = 0; x < pd.w; x += 3) {
+            const wy = py + 3 + Math.round(Math.sin(this.time * 2.8 + x * 0.12) * 2.2);
+            ctx.fillStyle = ((x + Math.floor(this.time * 6)) % 9 < 4) ? 'rgba(128, 255, 234, 0.36)' : 'rgba(35, 181, 155, 0.30)';
+            ctx.fillRect(px + x, wy, 2, 1);
+            const wy2 = py + 6 + Math.round(Math.cos(this.time * 2.2 + x * 0.09) * 2.0);
+            ctx.fillStyle = 'rgba(77, 255, 219, 0.22)';
+            ctx.fillRect(px + x, wy2, 2, 1);
+          }
+        } else {
+          // 3. Sector 09 Incandescent Molten Geothermal Magma + Drifting Basalt Crust Plates
+          const grad = ctx.createLinearGradient(0, py, 0, py + pd.h);
+          grad.addColorStop(0, '#ffaa33');
+          grad.addColorStop(0.45, '#e84e1b');
+          grad.addColorStop(1, '#8c1d0c');
+          ctx.fillStyle = grad;
+          ctx.fillRect(px, py, pd.w, pd.h);
+
+          // Bright molten convection hotspots
+          for (let x = 0; x < pd.w; x += 12) {
+            const hot = Math.sin(this.time * 3.1 + x * 0.18);
+            if (hot > 0.2) {
+              ctx.fillStyle = hot > 0.72 ? '#fff5cf' : '#ffd875';
+              ctx.fillRect(px + x, py + 2, 7, 2);
+            }
+          }
+
+          // Dark cooling basalt crust plates drifting slowly across molten cracks
+          const drift = this.time * 6.5;
+          for (let i = 0; i < pd.w; i += 24) {
+            const plateX = px + Math.round(((i + drift) % (pd.w + 20)) - 10);
+            const plateW = 12 + (i % 7);
+            ctx.fillStyle = '#1f0b0a';
+            ctx.fillRect(plateX, py + 1, plateW, 4);
+            ctx.fillStyle = '#3b1511';
+            ctx.fillRect(plateX + 1, py + 1, plateW - 2, 2);
+            ctx.fillStyle = '#732919';
+            ctx.fillRect(plateX + 2, py + 1, plateW - 4, 1);
           }
         }
 
-        // Reflected gondola warm lanterns & lamps
-        if (this.level.machinery) {
-          for (const g of this.level.machinery.gondolas) {
-            const gx = lerp(g.prevX, g.x, alpha) + 22;
-            const gy = lerp(g.prevY, g.y, alpha) - 7;
-            if (gx >= pd.x - 20 && gx <= pd.x + pd.w + 20) {
-              const rx = Math.round(gx - intCamX + Math.sin(this.time * 5.1) * 1.6);
-              ctx.fillStyle = '#ffaa33';
-              ctx.fillRect(rx - 2, py + 1, 5, 3);
-              ctx.fillStyle = '#fff3d6';
+        // Wave-Distorted Inverted Real-Time Reflections (Water & Coolant)
+        if (biome !== 'sector09') {
+          ctx.globalAlpha = biome === 'sector07' ? 0.34 : 0.40;
+          for (const cr of this.level.crystals) {
+            const cx = cr.x + cr.sprite.width * 0.5;
+            if (cx >= pd.x - 16 && cx <= pd.x + pd.w + 16 && Math.abs(cr.y + cr.sprite.height - pd.y) < 58) {
+              const wave = Math.round(Math.sin(this.time * 4.2 + cr.x) * 1.4);
+              ctx.save();
+              ctx.translate(
+                Math.round(cr.x - intCamX + wave),
+                Math.round(2 * pd.y - (cr.y + cr.sprite.height) - intCamY + cr.sprite.height)
+              );
+              ctx.scale(1, -1);
+              ctx.drawImage(cr.sprite, 0, 0);
+              ctx.restore();
+            }
+          }
+
+          for (const lamp of this.level.lamps) {
+            const lx = lamp.x + 10;
+            if (lx >= pd.x - 18 && lx <= pd.x + pd.w + 18 && Math.abs(lamp.y - pd.y) < 110) {
+              const rx = Math.round(lx - intCamX + Math.sin(this.time * 5.2 + lx) * 1.5);
+              ctx.fillStyle = biome === 'sector07' ? '#4dffdb' : '#ff595e';
+              ctx.fillRect(rx - 2, py + 1, 5, 4);
+              ctx.fillStyle = '#ffffff';
               ctx.fillRect(rx - 1, py + 2, 3, 2);
             }
           }
+
+          if (this.level.machinery) {
+            for (const g of this.level.machinery.gondolas) {
+              const gx = lerp(g.prevX, g.x, alpha) + 22;
+              if (gx >= pd.x - 20 && gx <= pd.x + pd.w + 20) {
+                const rx = Math.round(gx - intCamX + Math.sin(this.time * 5.1) * 1.6);
+                ctx.fillStyle = '#ffaa33';
+                ctx.fillRect(rx - 2, py + 1, 5, 4);
+                ctx.fillStyle = '#fff3d6';
+                ctx.fillRect(rx - 1, py + 2, 3, 2);
+              }
+            }
+          }
+
+          if (prx + 12 >= pd.x - 8 && prx <= pd.x + pd.w + 8 && Math.abs(pry + 18 - pd.y) < 40) {
+            const frame = this.player.getRenderFrame(this.awakened);
+            const distFromSurface = Math.max(0, pd.y - (pry + 18));
+            const wave = Math.round(Math.sin(this.time * 6.5) * 1.5);
+            const refFootX = Math.round(prx + 6 - intCamX + wave);
+            const refFootY = Math.round(py + distFromSurface);
+            ctx.save();
+            ctx.translate(refFootX, refFootY);
+            ctx.scale(this.player.facing, -1);
+            ctx.drawImage(frame, -12, -22);
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1;
         }
 
-        // Reflected protagonist robot ("PICO") when standing/jumping near basin
-        if (prx + 12 >= pd.x - 8 && prx <= pd.x + pd.w + 8 && Math.abs(pry + 18 - pd.y) < 38) {
-          const frame = this.player.getRenderFrame(this.awakened, this.wakeTimer);
-          const distFromSurface = Math.max(0, pd.y - (pry + 18));
-          const wave = Math.round(Math.sin(this.time * 6.5) * 1.4);
-          const refFootX = Math.round(prx + 6 - intCamX + wave);
-          const refFootY = Math.round(py + distFromSurface);
-          ctx.save();
-          ctx.translate(refFootX, refFootY);
-          ctx.scale(this.player.facing, -1);
-          ctx.drawImage(frame, -12, -22);
-          ctx.restore();
+        // Animated Sine-Wave Top Meniscus & Foam Crest
+        for (let x = 0; x < pd.w; x++) {
+          const waveY = py + Math.round(Math.sin(this.time * 3.4 + x * 0.22) * 0.65);
+          if (biome === 'sector04') {
+            const crest = Math.sin(this.time * 2.8 + x * 0.35) > 0.3;
+            ctx.fillStyle = crest ? '#8ee0ff' : '#3578ad';
+            ctx.fillRect(px + x, waveY, 1, 1);
+          } else if (biome === 'sector07') {
+            const foam = Math.sin(this.time * 3.8 + x * 0.42) > 0.15;
+            ctx.fillStyle = foam ? '#e0fff9' : '#4dffdb';
+            ctx.fillRect(px + x, waveY, 1, 1);
+          } else {
+            const crustEdge = Math.sin(this.time * 3.2 + x * 0.3) > 0.1;
+            ctx.fillStyle = crustEdge ? '#fff5cf' : '#ffaa33';
+            ctx.fillRect(px + x, waveY, 1, 1);
+          }
         }
+
         ctx.restore();
-
-        // 2. Water / Coolant / Magma Basin Fill + Shimmering Fresnel Surface Highlights
-        ctx.fillStyle = pal.waterColor;
-        ctx.fillRect(px, py, pd.w, pd.h);
-        for (let x = 0; x < pd.w; x += 4) {
-          const wave = Math.sin(this.time * 2.6 + x * 0.25) > 0.22;
-          ctx.fillStyle = wave ? pal.waterHighlight : pal.waterMid;
-          ctx.fillRect(px + x, py, 3, 1);
-        }
       }
     }
 
     renderWorldTooltips(ctx, intCamX, intCamY) {
-      // 1. Floating Lore Terminal Window (non-blocking, crisp pixel log box)
       if (this.activeTerminal) {
         const tm = this.activeTerminal;
         const lines = [tm.title, ...tm.lines];
@@ -1816,7 +2119,6 @@
         }
       }
 
-      // 2. Exit Elevator Lock / Ready Hint when standing near lift
       for (const e of this.machinery.elevators) {
         if (e.mode !== 'exit') continue;
         const dist = Math.hypot(this.player.x + 6 - (e.x + 24), this.player.y + 18 - e.y);
@@ -1899,12 +2201,10 @@
       dctx.imageSmoothingEnabled = false;
       dctx.scale(scale, scale);
 
-      // Top-left Sector Tag + Mute Tag
       const secTitle = `SEC-0${this.sectorIndex === 0 ? '4' : this.sectorIndex === 1 ? '7' : '9'}`;
       drawPixelText(dctx, secTitle, 8, 8, 'rgba(200, 225, 250, 0.58)', '#030408');
       drawPixelText(dctx, this.audio.muted ? 'M:OFF' : 'M:SFX', 42, 8, 'rgba(180, 205, 235, 0.38)');
 
-      // Top-right Shard Counter + Sector Core Status
       const hudX = PIXEL_W - 64;
       const hudY = 8;
       dctx.fillStyle = 'rgba(6, 10, 20, 0.55)';
@@ -1920,7 +2220,6 @@
         dctx.fillRect(hudX + 42, hudY + 2, 3, 3);
       }
 
-      // Fading Controls Hint
       if (this.hintAlpha > 0.02 && this.awakened) {
         dctx.globalAlpha = this.hintAlpha * 0.85;
         const hint = 'WASD / ARROWS MOVE • SPACE JUMP • S DROP • R CHECKPOINT';
@@ -1933,7 +2232,6 @@
         dctx.globalAlpha = 1;
       }
 
-      // Event / Sector Title Banner
       if (this.bannerTimer > 0) {
         const alpha = clamp(Math.min(this.bannerTimer, 3.5 - this.bannerTimer + 0.6) * 1.4, 0, 1);
         dctx.globalAlpha = alpha;
@@ -1948,7 +2246,6 @@
         dctx.globalAlpha = 1;
       }
 
-      // Surface Broadcast Finale Summary Card
       if (this.finaleActive && this.finaleTimer > 1.4) {
         const cardAlpha = clamp((this.finaleTimer - 1.4) * 1.2, 0, 1);
         dctx.globalAlpha = cardAlpha;
@@ -1981,7 +2278,6 @@
         dctx.globalAlpha = 1;
       }
 
-      // Awakening Dim Fade + Smooth Transition Overlay
       let blackAlpha = this.transitionAlpha;
       if (!this.awakened && this.wakeTimer < 0.7) {
         blackAlpha = Math.max(blackAlpha, clamp(1 - this.wakeTimer / 0.7, 0, 0.88));
@@ -2012,6 +2308,3 @@
 
   new Game();
 })();
-</script>
-</body>
-</html>
